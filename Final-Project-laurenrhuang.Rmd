@@ -1,0 +1,35 @@
+---
+title: "Final Project"
+author: "Lauren Huang"
+date: "2022-10-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Read in data
+
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+
+# read in the data
+Maths <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Maths.csv",
+                  show_col_types = FALSE)
+Maths
+
+Portuguese <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Portuguese.csv",
+                       show_col_types = FALSE)
+Portuguese
+```
+
+## Exploratory Data Analysis
+
+
+```{r}
+
+```
+
