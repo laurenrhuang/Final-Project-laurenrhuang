@@ -9,27 +9,323 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Read in data
+## Reading in the data, cleaning the data
 
+*EXPLANATION GOES HERE*
 
 ```{r}
 library(tidyverse)
 library(tidymodels)
+library(MASS)
+library(discrim)
+library(poissonreg)
+library(corrr)
+library(klaR) # for naive bayes
+tidymodels_prefer()
 
-# read in the data
-Maths <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Maths.csv",
+# read in the Maths dataset
+Maths <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/Maths.csv",
                   show_col_types = FALSE)
-Maths
+Maths %>% head()
+Maths %>% count()
 
-Portuguese <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Portuguese.csv",
+# read in the Portuguese dataset
+Portuguese <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/Portuguese.csv",
                        show_col_types = FALSE)
-Portuguese
+Portuguese %>% head()
+Portuguese %>% count()
 ```
+
+```{r}
+# add course = "Maths" as a predictor to label the dataset
+course <- rep("Maths", times=395)
+Maths_new <- cbind(Maths, course)
+Maths_new %>% head()
+
+# add course = "Portuguese" as a predictor to label the dataset
+course <- rep("Portuguese", times=649)
+Portuguese_new <- cbind(Portuguese, course)
+Portuguese_new %>% head()
+```
+
 
 ## Exploratory Data Analysis
 
+### How should we use the 2 datasets?
+
+*EXPLANATION GOES HERE*
+
+#### 1. Merging the data
 
 ```{r}
+# merge dataset (without labels) into one large dataset 
+# for use later on in the project
+all_classes <- rbind(Maths, Portuguese)
+all_classes
 
+# merge course labeled Maths and Portuguese datasets into one large dataset
+all_classes2 <- rbind(Maths_new, Portuguese_new)
+all_classes2
+
+# split labeled, merged dataset into training and testing
+set.seed(3435)
+
+grades_split <- initial_split(all_classes2, prop = 0.8,
+                               strata = G1)
+grades_train <- training(grades_split)
+grades_test <- testing(grades_split)
+
+grades_train_fctr <- grades_train %>%
+  mutate(G1 = as.factor(G1),
+         G2 = as.factor(G2),
+         G3 = as.factor(G3))
+
+grades_test_fctr <- grades_test %>%
+  mutate(G1 = as.factor(G1),
+         G2 = as.factor(G2),
+         G3 = as.factor(G3))
 ```
 
+#### 2. Using one dataset for training, using one dataset for testing
+
+*ASK FOR HELP HERE*
+
+```{r}
+# split labeled dataset by "course" predictor
+# Portuguese has 649 observations, Math has 395 observations -> Portuguese/(Portuguese and Math) = 649/1044 = 0.62
+set.seed(3435)
+
+grades_split2 <- group_initial_split(all_classes2, group = course,
+                                     prop = 0.6234)
+
+# use Portuguese for training
+grades_train2 <- training(grades_split2)
+# use Maths for testing
+grades_test2 <- testing(grades_split2)
+
+# verify number of observations
+grades_train2 %>% head()
+grades_test2 %>% head()
+
+grades_train2 %>% count() # all Portuguese observations
+grades_test2 %>% count() # all Maths observations
+
+# convert course to a factor, then remove
+grades_train2_nocourse <- grades_train2 %>%
+#  mutate(course = as.factor(course)) %>%
+  select(-course)
+
+grades_test2_nocourse <- grades_test2 %>%
+#  mutate(course = as.factor(course)) %>%
+  select(-course)
+
+grades_train2_fctr <- grades_train2 %>%
+  mutate(G3 = as.factor(G3))
+#  mutate(G1 = as.factor(G1),
+#         G2 = as.factor(G2),
+#         G3 = as.factor(G3))
+
+grades_test2_fctr <- grades_test2 %>%
+  mutate(G3 = as.factor(G3))
+#  mutate(G1 = as.factor(G1),
+#         G2 = as.factor(G2),
+#         G3 = as.factor(G3))
+```
+
+
+## Should we choose Regression or Classification?
+
+*EXPLANATION GOES HERE*
+
+### Regression
+
+#### 1. Linear Regression Model (merged dataset)
+
+```{r}
+#all_classes_G1 <- all_classes %>%
+#  select(-G2, -G3)
+#all_classes_G1
+
+# test out a linear regression model on our merged dataset
+grades_recipe1 <- recipe(G3 ~ ., data=all_classes2) %>%
+  step_dummy(all_nominal_predictors())
+
+lm_model <- linear_reg() %>% 
+  set_engine("lm")
+
+lm_wflow <- workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(grades_recipe1)
+
+lm_fit <- fit(lm_wflow, grades_train)
+
+lm_fit %>% 
+  # This returns the parsnip object:
+  extract_fit_parsnip() %>% 
+  # Now tidy the linear model object:
+  tidy()
+
+grades_train_res <- predict(lm_fit, new_data = grades_train %>% select(-G3))
+grades_train_res %>% 
+  head()
+
+grades_train_res <- bind_cols(grades_train_res, grades_train %>% select(G3))
+grades_train_res %>% 
+  head()
+
+grades_train_res %>% 
+  ggplot(aes(x = .pred, y = G3)) +
+  geom_point(alpha = 0.2) +
+  geom_abline(lty = 2) + 
+  theme_bw() +
+  coord_obs_pred()
+
+grades_metrics1 <- metric_set(rmse, rsq, mae)
+grades_metrics1(grades_train_res, truth = G3, 
+                estimate = .pred)
+```
+
+#### 2. Linear Regression Model (Portuguese data for training, Maths data for testing)
+
+```{r}
+# test out a linear regression model on our second dataset (using Portuguese for training, Maths for testing)
+grades_recipe2 <- recipe(G3 ~ ., data=all_classes) %>%
+  step_dummy(all_nominal_predictors())
+
+lm_model <- linear_reg() %>% 
+  set_engine("lm")
+
+lm_wflow2 <- workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(grades_recipe2)
+
+lm_fit <- fit(lm_wflow2, grades_train2)
+
+lm_fit %>% 
+  # This returns the parsnip object:
+  extract_fit_parsnip() %>% 
+  # Now tidy the linear model object:
+  tidy()
+
+grades_train_res2 <- predict(lm_fit, new_data = grades_train2_nocourse %>% select(-G3))
+grades_train_res2 %>% 
+  head()
+
+grades_train_res2 <- bind_cols(grades_train_res2, grades_train2_nocourse %>% select(G3))
+grades_train_res2 %>% 
+  head()
+
+grades_train_res2 %>% 
+  ggplot(aes(x = .pred, y = G3)) +
+  geom_point(alpha = 0.2) +
+  geom_abline(lty = 2) + 
+  theme_bw() +
+  coord_obs_pred()
+
+grades_metrics2 <- metric_set(rmse, rsq, mae)
+grades_metrics2(grades_train_res2, truth = G3, 
+                estimate = .pred)
+```
+
+
+### Classification
+
+#### 1. Logistic Regression Model (merged dataset)
+
+```{r}
+# test out a logistic regression model on our merged dataset
+log_reg <- logistic_reg() %>% 
+  set_engine("glm")
+
+log_wkflow <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(grades_recipe1) # recipe from before
+
+log_fit <- fit(log_wkflow, grades_train_fctr)
+
+log_fit %>% 
+  tidy()
+
+predict(log_fit, new_data = grades_train_fctr, type = "prob")
+
+augment(log_fit, new_data = grades_train_fctr) %>%
+  conf_mat(truth = G3, estimate = .pred_class)
+
+log_reg_acc <- augment(log_fit, new_data = grades_train_fctr) %>%
+  accuracy(truth = G3, estimate = .pred_class)
+log_reg_acc # ASK TA ABOUT THIS
+```
+
+#### 2. Logistic Regression Model (Portuguese data for training, Maths data for testing)
+
+```{r}
+# test out a logistic regression model on our second dataset (using Portuguese for training, Maths for testing)
+log_reg <- logistic_reg() %>% 
+  set_engine("glm")
+
+log_wkflow2 <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(grades_recipe2) # recipe from before
+
+log_fit2 <- fit(log_wkflow2, grades_train2_fctr)
+
+log_fit2 %>% 
+  tidy()
+
+predict(log_fit2, new_data = grades_train2_fctr, type = "prob")
+
+augment(log_fit2, new_data = grades_train2_fctr) %>%
+  conf_mat(truth = G3, estimate = .pred_class)
+
+log_reg_acc2 <- augment(log_fit2, new_data = grades_train2_fctr) %>%
+  accuracy(truth = G3, estimate = .pred_class)
+log_reg_acc2 # ASK TA ABOUT THI
+```
+
+
+#### 1. Linear Discriminant Analysis (LDA) Model (merged dataset)
+
+```{r}
+# test out a lda model on our merged dataset
+lda_mod <- discrim_linear() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+lda_wkflow <- workflow() %>% 
+  add_model(lda_mod) %>% 
+  add_recipe(grades_recipe1) # recipe from before
+
+lda_fit <- fit(lda_wkflow, grades_train_fctr)
+
+# LDA model performance
+predict(lda_fit, new_data = grades_train_fctr, type = "prob")
+
+augment(lda_fit, new_data = grades_train_fctr) %>%
+  conf_mat(truth = G3, estimate = .pred_class)
+
+lda_acc <- augment(lda_fit, new_data = grades_train_fctr) %>%
+  accuracy(truth = G3, estimate = .pred_class)
+lda_acc # ASK TA ABOUT THIS
+```
+
+
+#### 2. Linear Discriminant Analysis (LDA) Model (Portuguese data for training, Maths data for testing)
+
+```{r}
+# test out a lda model on our second dataset (using Portuguese for training, Maths for testing)
+lda_wkflow2 <- workflow() %>% 
+  add_model(lda_mod) %>% 
+  add_recipe(grades_recipe2) # recipe from before
+
+lda_fit2 <- fit(lda_wkflow2, grades_train2_fctr)
+
+# LDA model performance
+predict(lda_fit2, new_data = grades_train2_fctr, type = "prob")
+
+augment(lda_fit2, new_data = grades_train2_fctr) %>%
+  conf_mat(truth = G3, estimate = .pred_class)
+
+lda_acc2 <- augment(lda_fit2, new_data = grades_train2_fctr) %>%
+  accuracy(truth = G3, estimate = .pred_class)
+lda_acc2 # ASK TA ABOUT THIS
+```
