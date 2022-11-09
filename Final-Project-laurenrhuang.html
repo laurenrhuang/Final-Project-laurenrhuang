@@ -358,6 +358,9 @@ display: none;
 
 <div id="TOC">
 <ul>
+<li><a href="#predicting-students-grades-in-two-portuguese-schools" id="toc-predicting-students-grades-in-two-portuguese-schools">Predicting
+students’ grades in two Portuguese schools</a>
+<ul>
 <li><a href="#reading-in-the-data-cleaning-the-data" id="toc-reading-in-the-data-cleaning-the-data">Reading in the data,
 cleaning the data</a></li>
 <li><a href="#exploratory-data-analysis" id="toc-exploratory-data-analysis">Exploratory Data Analysis</a>
@@ -372,23 +375,29 @@ Regression or Classification?</a>
 <li><a href="#classification" id="toc-classification">Classification</a></li>
 <li><a href="#k-fold-cross-validation-1" id="toc-k-fold-cross-validation-1">k-fold cross validation</a></li>
 </ul></li>
+</ul></li>
 </ul>
 </div>
 
+<div id="predicting-students-grades-in-two-portuguese-schools" class="section level1">
+<h1>Predicting students’ grades in two Portuguese schools</h1>
 <p>A brief introduction to the selected data set: The data contains
 information regarding students’ academic achievement in secondary
-education of two Portuguese schools. The dataset contains predictor
-variables, including but not limited to: school, sex, age, address,
-family size, parent status, mother’s education, father’s education,
-mother’s job, father’s job, etc. There are also variables called G1, G2
-and G3. G1 represents a student’s grade during first period, G2
-represents a student’s grade during second period. G3 represents a
-student’s final grade in the class. Having both G1 and G2 are extremely
-helpful in predicting G3, which is a student’s final grade in a
-class.</p>
+education of two Portuguese schools. There are two datasets. One for
+Maths class, one for Portuguese class. Both datasets contain the same
+predictor variables, including but not limited to: school, sex, age,
+address, family size, parent status, mother’s education, father’s
+education, mother’s job, father’s job, etc. There are also variables
+called G1, G2 and G3. G1 represents a student’s grade during first
+period, G2 represents a student’s grade during second period. G3
+represents a student’s final grade in the class. Having both G1 and G2
+are extremely helpful in predicting G3, which is a student’s final grade
+in a class.</p>
 <div id="reading-in-the-data-cleaning-the-data" class="section level2">
 <h2>Reading in the data, cleaning the data</h2>
-<p>The first step is <em>TYPE EXPLANATION HERE</em></p>
+<p>The first step is to install packages for any functions or models
+we’ll need to fit. For the framework of our models, we’ll be using
+tidymodels.</p>
 <pre class="r"><code>library(tidyverse)
 library(tidymodels)
 library(MASS)
@@ -396,9 +405,14 @@ library(discrim)
 library(poissonreg)
 library(corrr)
 library(klaR) # for naive bayes
-tidymodels_prefer()
-
-# read in the Maths dataset
+tidymodels_prefer()</code></pre>
+<p>After installing necessary packages, we read in our two datasets for
+the classes “Maths” and “Portuguese.” Before we do any analysis, we
+should get to know our data better first. Let’s take a look at the
+variables, the number of observations in each dataset, and make
+histograms for each of the datasets to see how G3 student grades are
+distributed.</p>
+<pre class="r"><code># read in the Maths dataset
 Maths &lt;- read_csv(&quot;C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/Maths.csv&quot;,
                   show_col_types = FALSE)
 Maths %&gt;% head()</code></pre>
@@ -452,6 +466,16 @@ hist(Portuguese$G3,
      xlab = &quot;student final grades (G3) in Portuguese&quot;,
      ylab = &quot;count&quot;)</code></pre>
 <p><img src="data:image/png;base64,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HAIUeqQnj9KCQ4BCj/TkUVpwCFDokZ48SgsOAQo90pNHacEhQKFHevIoLTgEKPRITx6lBYcAhR7pyaO04BCg0CM9eZQWHAIUeqQnj9KCQ4BCj/TkUVpwCFDokZ48SgsOAQo90pNHacEhQKFHevIoLTgEKPRITx6lBYcAhR7pyaO04BCg0CM9eZQWHAIUeqQnj9KCQ4BCj/TkUVpwhg1QG9trjT2ysJOePEoLDgEKPdKTR2nBGTZAh2w19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOykJ4/SghNCFNpajT2ysJOePEoLTghRaGs19sjCTnryKC04IUShrdXYIws76cmjtOCEEIW2VmOPLOx6n7zZ5eezs7N3l18MbSktOCFEoa2VydjTgYV+5+HihTfjD953bU6VwAkhCm2tCNBw9TkPN08q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" width="672" /></p>
+<p>As we mentioned earlier, the goal of using this data will be using
+our predictor variables (ex. school, sex, age, address, family size,
+parental status, mother’s education, father’s education, etc.) to
+predict a student’s G3 (final grade) grade/whether a student will pass
+the class. As we look through the variables, we see that G1 and G2
+grades are included. This is great because they will help us in
+predicting G3 grades.</p>
+<p>Let’s add a variable called “course” so we know which observations
+are from which dataset. This is important because later we will be
+merging and/or splitting the dataset, so we want to keep track.</p>
 <pre class="r"><code># add course = &quot;Maths&quot; as a predictor to label the dataset
 course &lt;- rep(&quot;Maths&quot;, times=395)
 Maths_new &lt;- cbind(Maths, course)
@@ -521,12 +545,27 @@ Portuguese_new %&gt;% head()</code></pre>
 <h2>Exploratory Data Analysis</h2>
 <div id="how-should-we-use-the-2-datasets" class="section level3">
 <h3>How should we use the 2 datasets?</h3>
-<p><em>EXPLANATION GOES HERE</em></p>
-<div id="merging-the-data" class="section level4">
-<h4>1. Merging the data</h4>
+<p>Since we have 2 datasets and not just 1, there are more options with
+how we can use them. Let’s try two different ways: 1. Method 1 will be
+to take both the Maths and Portuguese datasets and merge them into one
+big dataset. 2. Method 2 will be to use one dataset to train, and the
+other to test our models. I will be using Portuguese to train and Maths
+to test because Portuguese has more observations (usually we want the
+proportion of training data to be bigger than testing!) We will use both
+methods of data splitting to see which gives us more accurate
+predictions from the models.</p>
+<div id="method-1.-merging-the-data" class="section level4">
+<h4>Method 1. Merging the data</h4>
+<p>For method 1, let’s merge both Maths and Portuguese into one large
+dataset. Mainly we will be working with the data that is labeled by
+course. After merging, split the merged dataset into training dataset
+and testing dataset, stratifying on G3, our outcome variable.
+Stratifying on G3 helps us keep the proportions of the original dataset
+when we split into training and testing! (You’ll notice I’m also merging
+the data that doesn’t have the course variable because I’ll need to use
+it later on.)</p>
 <pre class="r"><code># merge dataset (without labels) into one large dataset 
-# for use later on in the project
-all_classes &lt;- rbind(Maths, Portuguese)
+all_classes &lt;- rbind(Maths, Portuguese) # for train/testing use later on in the project
 all_classes %&gt;% head()</code></pre>
 <pre><code>## # A tibble: 6 × 33
 ##   school sex     age address famsize Pstatus  Medu  Fedu Mjob     Fjob    reason
@@ -575,17 +614,25 @@ all_classes2 %&gt;% head()</code></pre>
 ## 6       10 15 15 15  Maths</code></pre>
 <pre class="r"><code># split labeled, merged dataset into training and testing
 set.seed(3435)
-
 grades_split &lt;- initial_split(all_classes2, prop = 0.7,
                               strata = G3)
-
 grades_train &lt;- training(grades_split)
 grades_test &lt;- testing(grades_split)</code></pre>
 </div>
-<div id="using-one-dataset-for-training-using-one-dataset-for-testing" class="section level4">
-<h4>2. Using one dataset for training, using one dataset for
+<div id="method-2.-using-one-dataset-for-training-using-one-dataset-for-testing" class="section level4">
+<h4>Method 2. Using one dataset for training, using one dataset for
 testing</h4>
-<p><em>ASK FOR HELP HERE</em></p>
+<p>Next, for method two, let’s take that large merged dataset we made in
+the previous step. To use Portuguese for training and Maths for testing,
+I’m going to group the data by the course variable when we split. With a
+little bit of math, we can calculate exactly where to split the data so
+the training is Portuguese data and testing is Maths data. We can check
+that we split the data correctly by verifying the number of observations
+in grades_train2 and grades_test2 matches the number of observations in
+Portuguese and Maths. Which it does, yay! Next, I’m going to remove the
+course labels from the training and testing datasets, because this may
+cause problems later on when we try to compare predictions during
+training/testing.</p>
 <pre class="r"><code># split labeled dataset by &quot;course&quot; predictor
 # Portuguese has 649 observations, Math has 395 observations -&gt; Portuguese/(Portuguese and Math) = 649/1044 = 0.62
 set.seed(3435)
@@ -613,22 +660,53 @@ grades_test2_nocourse &lt;- grades_test2 %&gt;%
 </div>
 <div id="should-we-choose-regression-or-classification" class="section level2">
 <h2>Should we choose Regression or Classification?</h2>
-<p><em>EXPLANATION GOES HERE</em></p>
+<p>The next tricky question we have is to use regression or
+classification methods. Technically G3 grades are discrete, for example
+a student can get a grade of 0, 1, 4, 5, but nothing like 1.5 or 4.33.
+However, from our histogram earlier, we saw that some grades are more
+commonly earned than others. Specifically, many students earn grades of
+0, 9 or 10, but there are very few/no students who earn a grade of 4.
+Because the grades are so disproportionately spread out, this might
+cause a problem if we use a classification model. There wouldn’t be
+“enough” grades in each level/category for the model to be trained well.
+Because of this problem, let’s try fitting models in both regression and
+classification.</p>
+<p>Please note: for each of the models below, I will be fitting one
+model for each method of data splitting. (ex. linear regression model
+for merged dataset, linear regression model for Portuguese=training,
+Maths=testing) We will compare the two and see which method of data
+splitting gives us better predictions.</p>
 <div id="regression" class="section level3">
 <h3>Regression</h3>
-<div id="linear-regression-model-merged-dataset" class="section level4">
-<h4>1. Linear Regression Model (merged dataset)</h4>
-<pre class="r"><code># test out a linear regression model on our merged dataset
-grades_recipe1 &lt;- recipe(G3 ~ ., data=all_classes2) %&gt;%
+<p>We will make 2 recipes, the first one we use when working with Method
+1. merged dataset (has course variable) and the second we use when
+working with Method 2. Portuguese for training, Maths for testing
+(without course variable).</p>
+<p>The reason for this is because for Method 2, we split the data into
+training/testing by course. However, when we fit models and predict,
+having course=Portuguese for training and course=Math throws an error
+because the model won’t know how to carry over its training knowledge to
+testing when the two courses are not the same. Therefore we need this
+2nd recipe without the course variable, and we need
+grades_train2_nocourse and grades_test2_nocourse to fit the model.</p>
+<pre class="r"><code>grades_recipe1 &lt;- recipe(G3 ~ ., data=all_classes2) %&gt;%
   step_dummy(all_nominal_predictors())
 
+grades_recipe2 &lt;- recipe(G3 ~ ., data=all_classes) %&gt;%
+  step_dummy(all_nominal_predictors())</code></pre>
+<p>We’ll begin with a linear regression model.</p>
+<div id="linear-regression-model-method-1.-merged-dataset" class="section level4">
+<h4>Linear Regression Model (Method 1. merged dataset)</h4>
+<pre class="r"><code># test out a linear regression model on our merged dataset
 lm_model &lt;- linear_reg() %&gt;% 
   set_engine(&quot;lm&quot;)
 
+# create workflow
 lm_wflow &lt;- workflow() %&gt;% 
   add_model(lm_model) %&gt;% 
   add_recipe(grades_recipe1)
 
+# fit
 lm_fit &lt;- fit(lm_wflow, grades_train)
 
 lm_fit %&gt;% 
@@ -650,7 +728,8 @@ lm_fit %&gt;%
 ##  9 freetime     0.0134     0.0670    0.200  0.841  
 ## 10 goout       -0.0200     0.0623   -0.321  0.749  
 ## # … with 33 more rows</code></pre>
-<pre class="r"><code>grades_train_res &lt;- predict(lm_fit, new_data = grades_train %&gt;% select(-G3))
+<pre class="r"><code># put predictions and actual observations together
+grades_train_res &lt;- predict(lm_fit, new_data = grades_train %&gt;% select(-G3))
 grades_train_res &lt;- bind_cols(grades_train_res, grades_train %&gt;% select(G3))
 grades_train_res %&gt;% 
   head()</code></pre>
@@ -663,14 +742,16 @@ grades_train_res %&gt;%
 ## 4  4.50     6
 ## 5  9.93    10
 ## 6  3.95     5</code></pre>
-<pre class="r"><code>grades_train_res %&gt;% 
+<pre class="r"><code># plot to visualize
+grades_train_res %&gt;% 
   ggplot(aes(x = .pred, y = G3)) +
   geom_point(alpha = 0.2) +
   geom_abline(lty = 2) + 
   theme_bw() +
   coord_obs_pred()</code></pre>
 <p><img src="data:image/png;base64,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" width="672" /></p>
-<pre class="r"><code>grades_metrics1 &lt;- metric_set(rmse, rsq, mae)
+<pre class="r"><code># our metrics
+grades_metrics1 &lt;- metric_set(rmse, rsq, mae)
 grades_metrics1(grades_train_res, truth = G3, 
                 estimate = .pred)</code></pre>
 <pre><code>## # A tibble: 3 × 3
@@ -680,20 +761,19 @@ grades_metrics1(grades_train_res, truth = G3,
 ## 2 rsq     standard       0.843
 ## 3 mae     standard       0.971</code></pre>
 </div>
-<div id="linear-regression-model-portuguese-data-for-training-maths-data-for-testing" class="section level4">
-<h4>2. Linear Regression Model (Portuguese data for training, Maths data
+<div id="linear-regression-model-method-2.-portuguese-for-training-maths-for-testing" class="section level4">
+<h4>Linear Regression Model (Method 2. Portuguese for training, Maths
 for testing)</h4>
 <pre class="r"><code># test out a linear regression model on our second dataset (using Portuguese for training, Maths for testing)
-grades_recipe2 &lt;- recipe(G3 ~ ., data=all_classes) %&gt;%
-  step_dummy(all_nominal_predictors())
-
 lm_model &lt;- linear_reg() %&gt;% 
   set_engine(&quot;lm&quot;)
 
+# create workflow
 lm_wflow2 &lt;- workflow() %&gt;% 
   add_model(lm_model) %&gt;% 
   add_recipe(grades_recipe2)
 
+# fit
 lm_fit &lt;- fit(lm_wflow2, grades_train2_nocourse)
 
 lm_fit %&gt;% 
@@ -715,7 +795,8 @@ lm_fit %&gt;%
 ##  9 freetime     -0.0500    0.0527    -0.950  0.343 
 ## 10 goout        -0.0189    0.0504    -0.375  0.708 
 ## # … with 32 more rows</code></pre>
-<pre class="r"><code>grades_train_res2 &lt;- predict(lm_fit, new_data = grades_train2 %&gt;% select(-G3))
+<pre class="r"><code># put predictions and actual observations together
+grades_train_res2 &lt;- predict(lm_fit, new_data = grades_train2 %&gt;% select(-G3))
 grades_train_res2 &lt;- bind_cols(grades_train_res2, grades_train2_nocourse %&gt;% select(G3))
 grades_train_res2 %&gt;% 
   head()</code></pre>
@@ -728,14 +809,16 @@ grades_train_res2 %&gt;%
 ## 4 14.5     14
 ## 5 13.0     13
 ## 6 12.4     13</code></pre>
-<pre class="r"><code>grades_train_res2 %&gt;% 
+<pre class="r"><code># plot to visualize
+grades_train_res2 %&gt;% 
   ggplot(aes(x = .pred, y = G3)) +
   geom_point(alpha = 0.2) +
   geom_abline(lty = 2) + 
   theme_bw() +
   coord_obs_pred()</code></pre>
 <p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABUAAAAPACAMAAADDuCPrAAABelBMVEUAAAAAADoAAGYAOjoAOmYAOpAAZrYCAgIDAwMEBAQFBQUGBgYHBwcJCQkLCwsODg4RERESEhIVFRUWFhYaGhobGxsgICAiIiIoKCgqKioyMjIzMzM1NTU6AAA6OgA6Ojo6OmY6ZmY6ZpA6ZrY6kLY6kNs+Pj5CQkJNTU1NTW5NTY5Nbo5NbqtNjshTU1NgYGBmAABmOgBmOjpmZmZmZpBmkLZmkNtmtpBmtttmtv9oaGhuTU1ubo5ujqtujshuq+R4eHiCgoKOTU2Obk2Obm6OyOSOyP+QOgCQZjqQZmaQkDqQkLaQtraQttuQ2/+Wlpajo6Orbk2rjm6ryOSr5P+2ZgC2Zjq2kDq2kGa2tra229u22/+2//+8vLzIjk3Ijm7IyKvI5P/I///MzMzbkDrbkGbbtmbbtpDbttvb27bb2//b///kq27kyI7kyKvk///r6+v/tmb/yI7/25D/27b/29v/5Kv/5Mj/5OT//7b//8j//9v//+T///8mmWJzAAAACXBIWXMAAB2HAAAdhwGP5fFlAAAgAElEQVR4nO29jYPb1nmvyfQjia2ZoWmapiDDN/ejEejYgdreux+BmkRwetN296YDu0nuzd5KrQPvZtuosaJk7dbW/O97AIIckgNyAPD3nuF5398TS0OCIB4ecebJwfBwZnRFCCFkEKO7fgCEEBIqDCghhAyEASWEkIEwoIQQMhAGlBBCBsKAEkLIQBhQQggZCANKCCEDYUAJIWQgDCghhAyEASWEkIEwoIQQMhAGlBBCBsKAtvMOIUSEu/7ahsKAttPtWX7xQvhh1BJ5A4fR2eFBoXsYDKgJGFC4RN6guzxQhwcFA2oZBhQukTfoLg/U4UHBgFqGAYVL5A26ywN1eFAwoJZhQOESeYPu8kAdHhQMqGUYULhE3qC7PFCHBwUDahkGFC6RN+guD9ThQcGAWoYBhUvkDbrLA3V4UDCglmFA4RJ5g+7yQB0eFLuOJjUMqAkYULhE3qC0PBIOD4odx2i0bA0DagIGFC6RN+gsj4jDg2LbseonA2oDBhQukTeoLI+Mw4Niy7HuJwNqAwYULpE3aCyPkMODYtNx3U8G1AYMKFwib1BYHimHB8WGY6OfDKgNGFC4RN6grzxiDg+KrYBeX2ZATcCAwiXyBn3lEXN4UHAdqGUYULhE3qC7PFCHBwUDqpXf/OVi8d73P1leefXx48VideUaBhQukTfoLg/U4UHBgCrlHxY17/20uvLlh/WV7/xyZycGFC6RN+guD9ThQcGA6uTl4r3/enX1xUfLaD5bfPBJdeWDz7b3YkDhEnmD7vJAHR4UDKhKXn20+HH10U093cfPH9cZ/fLD5Xz0GgYULpE36C4P1OFBUTla8sKAhs2XHzan688WP7y6er74bn3leXVlEwYULpE3KCqPtMOD4sX2+s8VDKgS6oA+W05H3Xn9d7dvZUDhEnmDnvKIOzwoXrT2kwFVQn3W/uqj5tT988erb4Kufnn1C0LIMbh+tmxlQHVQn7wzoIQI0d5PBlQHL+tlTBsB3VnIxFN4uETeoObcV94hr2g9f7/iKbwOXj5+r/rmZ8sMtIEBhUvkDTrKo2QYe/rJgGrgebOMngFdGjiMzg4PCt3DYEDD5x8Wq2WffBW+NnAYnR0eFLqHwYCGzqtni/dX3/Bcrf/kOlB5ibxBd3mgDg8KBlQpzzbet8l3ItUGDqOzw4NC9zAY0MB5vvm+91cfLd7ne+E5jO4ODwrdw2BAw6b58UsV1bc9v+BPY+Iw+jg8KAIfRpMUBlQnLxdbAb364mN36fuf7e7GgMIl8obAy7NShD2M1fpPBtQ0DChcIm8IuzxrRdDDWK+fZ0BNw4DCJfKGoMtzrQh5GNfvP2JATcOAwiXyhpDLs6EIeBgb799kQE3DgMIl8oaAy7OpCHcYm+9/Z0BNw4DCJfKGcMuzpQh3GJvvf2dATcOAwiXyhnDLs6XQPQwG1AQMKFwib9BdHqjDg4IBtQwDCpfIG3SXB+rwoGBALcOAwiXyBt3lgTo8KBhQyzCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqAN8vJaMMKCmYUDhEnlDgOVpU4Q3jLbff8SAmoYBhUvkDeGVp1UR3DBaf38cA2oaBhQukTcEV552RWjDaP/9mwyoaRhQuETeEFp59igCG8ae31/MgJqGAYVL5A2BlWefIqxh7Pv97wyoaRhQuETeEFZ59irCGsa+3//OgJqGAYVL5A1hlWevQvcwGFATMKBwibxBd3mgDg8KBtQyDChcIm/QXR6ow4OCAbUMAwqXyBt0lwfq8KBgQC3DgMIl8gbd5YE6PCgYUMswoHCJvEF3eaAOwDFuSQcDahoGFC6RNwRSntsUYQxj3/rPtYIBtQwDCpfIG8Ioz62KOx9GWRTlbUe40c/dOzGgpmFA4RJ5w52XB6O462G4EroaHj7AjX7euBMDahoGFC6RN9x1eUCKOx6GK2HFwYLe7OeNOzGgpmFA4RJ5AwPa2bH/pnLVwgNn8S3n7zfuxICahgGFS+QNDGhnx/6bmhQenILeeP2o5U4MqGkYULhE3sCAdnbsv6lLQLvciQE1DQMKl8gbGNDOjv03dTmF73InBtQ0DChcIm9gQDs7DtzW5UWkDndiQE3DgMIl8gYGtLPj0I1dljHdficG1DQMKFwib7jr8oAUdz6MLgvpb70TA2oaBhQukTfceXkwihMeRo9cMKCmYUDhEnnDCZenj+J0h3Hb+9+3FAyoZRhQuETecLrl6aU42WH06ScDahsGFC6RN5xsefopTnUYvfrJgNqGAYVL5A2nWp6eihMdRr9+MqC2YUDhEnnDiZanr+I0h9GznwyobRhQuETecJrl6a04zWH07CcDahsGFC6RN5xmeXordA+DATUBAwqXyBt0lwfq8KBgQC3DgMIl8gbd5YE6PCgYUMswoHCJvEF3eaAODwoG1DIMKFwib9BdHqjDg4IBtQwDCpfIG3SXB+rose/ARDCgpmFA4RJ5w4mVZ6jitIbRd/3nWsGAWoYBhUvkDadVnsGKkxrG0H4yoLZhQOESecNJlWe44pSGMbifDKhtGFC4RN5wSuU5QnFCwxjeTwbUNgwoXCJvOKHyHKM4nWEc0U8G1DYMKFwibzid8hylOJ1hHNFPBtQ2DChcIm84nfIcpdA9DAbUBAwoXCJv0F0eqMODggG1DAMKl8gbdJcH6vCgYEAtw4DCJfIG3eWBOjwoGFDLMKBwibxBd3mgDg8KBtQyDChcIm/QXR6o45bbAVlgQE3DgMIl8oYTKA9CcffDOGb951rBgFqGAYVL5A13Xx6I4s6HgegnA2obBhQukTfceXkwirseBqSfDKhtGFC4RN5w1+UBKe54GJh+MqC2YUDhEnkDA9rZsf8mUD8ZUNswoHCJvIEBPUxZFOXy46X7WGRpVhR5luWrre5jWWz2M0+SvLlrnuVlLxkDahoGFC6RNzCgB3GBdJGsPz4tisyRxkmapWnebC2LrNllicunS2h9V1fZPCv2H/smDKhpGFC4RN7AgB7CtbGiCmX5tEzdzDNPk9jls5pc1ltLV8l6l+UdXD4rXEELl1hH3qegDKhpGFC4RN7AgB6gbAKaV418mqeunFmSRHGaubP4ot7qCplXey1P6fNVQHN3n2VA+5zFM6CmYUDhEnkDA3qApp9NQFNXUDcBTeMoq6eg9dYqk9dT0KafrqDNBLTfFJQBNQ0DCpfIGxjQAzCgIjCg7TCgcIm8gQE9wK2n8COewg+AAW2HAYVL5A0M6CFueRFpNBrxRaT+MKDtMKBwibyBAT3IwWVMVT+5jKk/DGg7DChcIm9gQA9zYCF91c/lQvpi4zSdC+lvhQFthwGFS+QNDGhnx8511Ps3NxUMqGUYULhE3sCAdnZsXxXoJwNqGwYULpE3MKCdHdtXBfrJgNqGAYVL5A0MaGeHBwUDahkGFC6RN+guD9ThQcGAWoYBhUvkDbrLA3V4UDCglmFA4RJ5g+7yQB0eFAyoZRhQuETeoLs8UIcHBQNqGQYULpE36C4P1NF8FPzyZ0BNw4DCJfIGBrSzY/lBYv3nWsGAWoYBhUvkDQxoZ0f9t2Q/GVDbMKBwibyBAe3sqP4S7ScDahsGFC6RNzCgnR1X0v1kQG3DgMIl8gYGtLNDvJ8MqG0YULhE3sCAdnbIvP99S8GAWuadF4QQPAyoCTgDhUvkDZyBdnZ4UHAGahkGFC6RN+guD9ThQcGAWoYBhUvkDbrLA3V4UDCglmFA4RJ5g+7yQB0eFAyoZRhQuETeoLs8KKoveQYUBQPaDgMKl8gbGNAO1Os/GVAUDGg7DChcIm9gQG9nuX6eAUXBgLbDgMIl8gYG9Faa9x8xoCgY0HYYULhE3sCA3sbq/ZsMKAoGtB0GFC6RNzCgt7B+/zsDioIBbYcBhUvkDQzoLazf/86AomBA22FA4RJ5AwPa2eFBwYBahgGFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlGFC4RN4QXHnKoihvbNgYRnW1zLMsX+22c4ftq2WRO6otq+1lkaVZ4a4tKZsbiuxRXh252pbnOw+hsRaVdveWPjCgpmFA4RJ5Q2gBXUZsd8Pli82rWZJnaZovd9u5w/bVKoZuz7xOZb29KNI0y5LENTh3/7mc1jdkWfEoScssc9vTKrmbD6GxZu5QWZ5t39ILBtQ0DChcIm8ILKAuVBXFzoanlxtXXfeSfFm/G3fYvlqUeVF1spqGLrcXZZVH19S4GLloVpPN6hY3J82e5G5jkRZVI4u8LHYelTtSbS3y4QVlQE3DgMIl8oawAlquAlhub3h6Wa6vutlillRZzOpZ5dYdtq+WVSDriWZ9xl9V0MUzr6avaTwajdzGrApimbtJqQtoFmfVJbd/kW9+I6C2unvW1qrFQ4fHgJqGAYVL5A1hBbTp340Z5dOnxfpqXlUubaagO3fYvtpMQKvWZvVEs6z7WUWy6mc1naxnodWsNMmfuO1JM7ndnoI2E9DGesQUlAE1DQMKl8gbGNDWgNbzTwZUBga0HQYULpE3hBVQX6fwdT8znsLLwIC2w4DCJfKGsALq6UUk18+4KPgikhAMaDsMKFwibwgsoH6WMY1GXMYkCAPaDgMKl8gbQgsoF9KHDwPaDgMKl8gbggtou0L3MBhQEzCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqMODggG1DAMKl8gbdJcH6vCgYEAtw4DCJfIG3eXpy6EvbQYUBQPaDgMKl8gbGNAN1r//qNUBURyEATUNAwqXyBsY0GsO9pMBhcGAtsOAwiXyBgZ0zeF+MqAwGNB2GFC4RN7AgK64pZ8MKAwGtB0GFC6RNzCgDbf1kwGFwYC2w4DCJfIGBrThtn4yoDAY0HYYULhE3sCAdnZ4UDCglmFA4RJ5g+7yQB0eFAyoZRhQuETeoLs8UIcHBQNqGQYULpE36C4P1OFBwYBahgGFS+QNussDdXhQMKCWYUDhEnmD7vJ0oeuXMwOKggFthwGFS+QN5gN66/rPtWOwojMMqGkYULhE3mA9oJ37yYDCYEDbYUDhEnmD8YB27ycDCoMBbYcBhUvkDbYD2qOfDCgMBrQdBhQukTeYDmiffjKgMBjQdhhQuETeYDygfRyDFL1gQE3DgMIl8gbTAe3n8KBgQC3DgMIl8gbd5YE6PCgYUMswoHCJvEF3eaAODwoG1DIMKFwib9BdHqjDg4IBtQwDCpfIG3SXB+rwoGBALcOAwiXyBt3l2ceQL2EGFAUD2g4DCpfIG0wGtNf6z7Wj/116KxhQyzCgcIm84aaiLIoS6xh+V/dYitXDWV+uH+D2o3TDWG4osqxY75HneZqkRX21usH9FUdJXlT9LDN3S5kncZLVh22Od2DwDCgKBrQdBhQukTfcUCxjAnUMvqd7LHmWLx/O+nL9ALPtR/nixfJhu0rWf+o9XD7ncZolibvq/iqSJJ1HSTRz/XRX0jyLojiJozh2h82y+niHBs+AomBA22FA4RJ5w67CFaQCWdDBo3CPJXe9zKuHs76cu6vuYr71KF9c1o86rWeTWVrvkbr5ZppkqaNM8zzL8niapnHs+lnmcT07nUVJmkYurmltKbNDg2dAUTCg7TCgcIm8YUdRrgIKPIsfOgr3IIo6mkU172wuO+qLebH5KJ/WAc3TzO2TZ2lenb67uacLaOrmna6S7mqazqduxun6GWepm3VmbjI6i9LETUHd7bUlKw4MngFFwYC2w4DCJfKGHUXTT+gUdOgomklnPTnMVpfruWIzL71+lJdP6wmom2e6CaiLpdsjy10/U9dPNwmdV/PNNJ67/yWjkZuFum1uAjqPZ/PUNTWJqvvlq3ntnsEzoCgY0HYYULhE3mAuoG4rA3q3MKDtMKBwibzB3Cl89R9P4e8UBrQdBhQukTfYexEpjVO+iHSnMKDtMKBwibzB4DKmtDoIlzHdHQxoOwwoXCJvsLiQvj4IF9LfGQxoOwwoXCJvsPNWzmO/bBlQFAxoOwwoXCJvMBPQQe9/33Icd/dOCgbUMgwoXCJvsBLQo/vJgMJgQNthQOESeYORgB7fTwYUBgPaDgMKl8gbbAQU0E8GFAYD2g4DCpfIG0wEFNFPBhQGA9oOAwqXyBuMBBThABzjNgUDahkGFC6RN5gIKMbhQcGAWoYBhUvkDbrLA3V4UDCglmFA4RJ5g+7yQB0eFAyoZRhQuETeoLs8UIcHBQNqGQYULpE36C4P1OFBwYBahgGFS+QNusuD/FJlQFEwoO0woHCJvEF1QCHrP9cO3KH2KhhQyzCgcIm8QXNAof1kQGEwoO0woHCJvEFxQLH9ZEBhMKDtMKBwibxBb0DB/WRAYTCg7TCgcIm8QW1A0f1kQGEwoO0woHCJvEFxQNEO8PHaFAyoZRhQuETeoDageIcHBQNqGQYULpE36C4P1OFBwYBahgGFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZBhQukTfoK4/UlycDioIBbYcBhUvkDeoCCl//uXbIHHZLwYBahgGFS+QN2gIq1k8GFAYD2g4DCpfIG5QFVK6fDCgMowH98sPvri4sar7zy+0dGFC4RN6gK6CC/WRAYRgN6LNFE9DPHzOgHEYPhwfF0iHZTwYUhsmAvnq2WAX05erCDgwoXCJvuKuAlkWeF2X1sfp7P9V+zZ55lqZZUeZJnGbuYpqkWXVDkWXZ4kGSl1VAiyJPk3g+i6obs3gepflSsOXZkd72GA4MAwsDqpbf/GixDuizxQ9b92FA4RJ5wx0FtFh20VG6fO2/b7VfmtZ7Zq6cSZZEcZLOXCDnM3fR5THJimT21iKJs+pg1T6zi/FsPI6S2XQ+dylNK8GWZ0d622M4MAwwDKhWni8WP/iXJqCvPnrvp607MaBwibzhbgLqSlfF0zW0rNhbr2q/LM+zKqMulVkWx1GUuXrOZy6U1Rw0zrMkiR/ez7IkzatJajJzjGfz6WQ+c42NojQty6zc8BTllnTnap9hoGFAtfL8/b9bn7l/+eEH/+jmo3/xye5ODChcIm+4k4C6CV8d0Kw6B6/itecMutovrwKa16fs7sQ9ms1dE+OZy2PsGprEUTUndQFNXFur3ZJoMplNLqbTi/PxtNp5HicuwstKNifzZbkh3bnaZxhwGFDNrAK6eg1p8ePVLe80vCCkC5dPn1xWPHp0+eRpxeX+/R49cTx69PDJ/Ufu7wdv3n/4xsP7b7/55lv3H7y9ePj2w8WD+w8ePnx43932aPHIbXnzjbfHb7z5xsXF+Vv333jw4P79xeJJo6k9l0+fPt2Q7lw9SRhQDawC+tKdzn929a8fL9Zn8gwo6QUD2g8GVAOrgD5vPt54LYmn8HCJvEHHKfyIp/ABYTyg19c/+GxrAwMKl8gbVLyINBqN+CJSODCgNZ8/3llJz4DCJfIGDcuYXD+5jCkgGNCazx9zBiotkTcoWEhf9XO5kL4suJA+AGwH9NVHzcvvN96QxIDCJfKG8N/KWb1/U8EwagUDqpiX6xePtkO6hgGFS+QNwZenfv97+MNYKhhQxWysA/3BZ1df/Gj3NSQGFC+RNwRfnvrnh4Q/jKWCAVXM+pT9efPDmHbfisSAwiXyBt3lgTo8KBhQxVx/z/OLv1ws3vvBZ7s7MKBwibxBd3mgDg8KBtQyDChcIm/QXR6ow4OCAbUMAwqXyBt0lwfq8KBgQC3DgMIl8gbd5YE6PCgYUMswoHCJvCHc8mx+GQY8jC0FA2oZBhQukTcEW56t338U7jC2FQyoZRhQuETeEGp5tn9/XLDD2FEwoJZhQOESeUOg5dn5/ZuhDmNXwYBahgGFS+QNYZZn9/cXBzqMGwoG1DIMKFwibwiyPDd+/3uYw7ipYEAtw4DCJfKGIMuz289Ah3FTwYBahgGFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZBhQukTfoLg/U4UHBgFqGAYVL5A26ywN1eFAwoJZhQOESeUNY5dn3pRfYMPYqGFDLMKBwibwhqPLcWP+5VgQ1jP0KBtQyDChcIm8IqTx7+xnWMA4oGFDLMKBwibwhoPLs72dQwzikYEAtw4DCJfKGcMpzoJ8hDeOgggG1DAMKl8gbginPoX4GNIzDCgbUMgwoXCJvCKY8h/oZ0DAOKxhQyzCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqMODggG1DAMKl8gbDirKoij7HrFIk2x1J3d/x6U7SlmkcZK6P1mW5eXywGWexnFalHlS3ZTmRZFnaZrVH90+1Wa3syOrLhXl8nC521aks2lcrB5ekWWX18MY8pg7wYCiYEDbYUDhEnnDIUUdvqLfAbMky9OkWN3fpTB/lJdZ5lI5n0zSaBpnLoHVgbMsjaI4qf7Es2mULQObxGmapC6TUZLG81nqrsbzKI5cabPqcK60WToZR/Fsliwfnjta8ejRMY+5GwwoCga0HQYULpE3HFC4FFX0qtFyypinxfL+bjbppodFWkRJFkWzeOKCmdaT0LKaV7oauq1REruKzl1j4yxJqtTmmbuDC2qcTN3VyN3gohoXeV64gObpdDaPkmQ+T6uHl9ST3Mts+GPuCAOKggFthwGFS+QN+xXlKkY9zoiLtAloVp1wl0VenXE/cVNS18P5fDYfzxI34UyrSWM1/3STzfm0ymEUzWdxVGUxcVNSd+budpu7mWk8jaLRvJqkushW4U2r5o6n83nspqdR1eEkXwa0GPqYu8KAomBA22FA4RJ5w35F06Je07lmAlpPQZsJqDuFz/JZms5cH6eziQtkNcPM3cl4VJ2eR5O5O3+P45mbn85jl1R3OUndHdw1N12NJ6PRyCU1Tl1cXUFde935fnUsd1pfTUGr2WoV0CIb+pi7woCiYEDbYUDhEnnDqQe07icDKu/2CAPaDgMKl8gbTvwU3vVzxlN4BtQEDChcIm847ReRXD/5IhIDagQGFC6RN5z0Mqaqn1zGxIAagQGFS+QNJ72QfjTiQvoKBtQEDChcIm/Q/R5IqMODggG1DAMKl8gbdJcH6vCgYEAtw4DCJfIG3eWBOjwoGFDLMKBwibxBd3mgDg8KBtQyDChcIm/QXR6ow4OCAbUMAwqXyBtOszx9v8ROdBi9FQyoZRhQuETecJLlOfj7j1oVJzmM/goG1DIMKFwibzjF8vTu52kOY4CCAbUMAwqXyBtOsDz9+3mSwxiiYEAtw4DCJfKG0yvPgH6e4jAGKRhQyzCgcIm84eTKM6SfJziMYQoG1DIMKFwibzi58gzp5wkOY5iCAbUMAwqXyBt0lwfq8KBgQC3DgMIl8gbd5YE6PCgYUMswoHCJvEF3eaAODwoG1DIMKFwib9BdHqjDg4IBtQwDCpfIG3SXB+rwoGBALcOAwiXyhtMpzzFfVic0jKMUDKhlGFC4RN5wMuUZtP5zrTiZYRynYEAtw4DCJfKGUynPUf08nWEcqWBALcOAwiXyhhMpz3H9PJlhHKtgQC3DgMIl8obTKM+R/TyVYRytYEAtw4DCJfKGkyjPsf08kWEcr2BALcOAwiXyhpMoz7H9PJFhHK9gQC3DgMIl8gbd5YE6PCgYUMswoHCJvEF3eaAODwoG1DIMKFwib9BdHqjDg4IBtQwDCpfIG3SXB+rwoGBALcOAwiXyBt3lgTo8KBhQyzCgcIm84W7Lg/pSYkBDggFthwGFS+QN3RVlUZSrD83ljc2ra3mWF3maVn9n8XQ8nsXZZTqfRWmWpYnbXJEl8/H5OMqK0WgUR3FaFPFsnqRJHEVJMp+MZ0mxPOry7yJzRyvKbdHgYQyGAUXBgLbDgMIl8obOimXClh+y5eWNzaudXOrSKM6SOI2T2cX52dm96fxiGs0mk/k8SqI4TtM0nk/uvX52fjZ1/UzmLp2ziyienk9mE7fvvfPzi4vZLKmOujx2lhVZkpZZtikaPIzhMKAoGNB2GFC4RN7QVeFaVpFVf7nZZfWhuN7chK1wM0U30UziLJsn08lkPL6Ynd97czKL59PxPI7SqCprND2/cLfU/ZwlSTIZz6fRfHZ+MZ9fXJzfqzI6j1OnqS2p66ebtcZFLd1TUAY0JBjQdhhQuETe0FFRLku5nHu6gFZX61P5JqD1ybVLnjt9d/2M0qQK4sX5+GL8+jfOLybz2eTczUHdOXoUzafn99xtF66f49ksTqLz8+l4Opuc3ZtM7t17/fWLydTdIXaHqiy5O/d3Ac3irJbuOYtnQEOCAW2HAYVL5A0dFU0o67mnm2aupqDN5mZm2ExA09hVMRm7ep5PXBZfuzeeTGfVt0OjeTKPZ/PJWdPPs4txHLkT+LGbq87G47OLi7N7r5+fV1fcFDSvLWmeJ24CmmbJoSkoAxoSDGg7DChcIm+4w4CeM6C7CgbUMgwoXCJvuLtT+PH5PZ7C7ygYUMswoHCJvOEOX0SajOd8EWlbwYBahgGFS+QNd7mMKXVn+lzGtKlgQC3DgMIl8oY7XUhfFikX0m8qGFDLMKBwibxBd3mgDg8KBtQyDChcIm/wXx6JLx8GNCQY0HYYULhE3uC9PEf//qNWBQMaEAxoOwwoXCJv8F0ekX4yoEHBgLbDgMIl8gbP5ZHpJwMaFAxoOwwoXCJv8FseoX4yoEHBgLbDgMIl8gav5ZHqJwMaFAxoOwwoXCJv8BxQKQUDGhAMaDsMKFwib9BdHqjDg4IBtQwDCpfIG3SXB+rwoGBALcOAwiXyBt3lgTo8KBhQyzCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqMODggG1DAMKl8gb/JRH+kuGAQ0JBrQdBhQukTd4KY/Y+s+1ggENCAa0nXdeENKC6+ddP4SwYUBNwBkoXCJv8DAM8fknZ6BhwYC2w4DCJfIGeYWHfjKgQcGAtsOAwiXyBnGFj34yoEHBgLbDgMIl8gYPAeUyps4KBtQyDChcIm/QXR6ow4OCAbUMAwqXyF1SsGEAACAASURBVBt0lwfq8KBgQC3DgMIl8gbd5YE6PCgYUMswoHCJvEF3eaAODwoG1DIMKFwib9BdHqjDg4IBtQwDCpfIG+QU6y8TBrSzggG1DAMKl8gbxBTX6z8Z0M4KBtQyDChcIm+QUmysn2dAOysYUMswoHCJvEFIsfn+Iwa0s4IBtQwDCpfIG2QUW+/fZEA7KxhQyzCgcInw8cvi8umtOxVZVtQ752kSx9F8HmdpkqZxFKdpmmV5kcXzOC/djm5zXpTuqK6fcZLG81mUpEl0P3LESZa7ncsyd/eo/hT1no68ulzU1wfDgIYEA9oOAwqXyB7eNevpZXHLTi6fLqFVR9NkNhtfjGez83k6u5hH00kUR2k6n82TaJ4VWZKlcex6WpSjUZTOzieT6XgynszdfcaTqStvmuVJkhdplLrW5mW1Z56lee62u6S6mg4eCQMaEgxoOwwoXCJ69KIsy6dPy8PZypazw8zNGtMomUwms+mFS+csnsyi+TRy08z5PHFzUTfFdCHMsiQt8tRNRWeus7Pp7Hw8vXhrcjGZzqdzV9ekmrOmLsVVMfNq8lnPS7Oq0m52OrigDGhIMKDtMKBwieTBy1VAD506F01AXfjcSft87OaSF+ezi7PpzM0v55NpMpvMZrE7X59N4yqOmatkGidJ7FJ77vY+Ozs/G1+cX4yn42kUJW7HJEmzJHbRTN2k1X1wuXX/Vef1xeGHcggGNCQY0HYYULhE8uBVP6uAHpz3Nf0ssriegE4nk7E7Nb84m43nk3E0m8TTyXzuwpjOJ66K1Qw0zqpMzqeT8fR8fD4+u1fl82LsehvF8yRxhXU7Je7EPakC6uahdUDz46agDGhIMKDtMKBwieTBGdCeDg8KBtQyDChcInlwnsL3dHhQMKCWYUDhEtGjC7yINOKLSEcpGFDLMKBwiezh4cuYRqNRvYwpjbiMaZCCAbUMAwqXCB8fvJC+7me9PL46jedC+v4KBtQyDChcIm8AKvb9/k2+lbOzggG1DAMKl8gbcIq9v7+YAe2sYEAtw4DCJfIGmGL/739nQDsrGFDLMKBwibwBGNC9DpRiPwxoSDCg7TCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqMODggG1DAMKl8gbdJcH6vCgYEAtw4DCJfIG3eWBOjwoGFDLMKBwibxBd3mgDg8KBtQyDChcIm84XnHrlwMD2lnBgFqGAYVL5A1HK/av/1w7jlXcDgMaEgxoOwwoXCJvOFZxez8Z0O4KBtQyDChcIm84UtGhnwxodwUDahkGFC6RNxyn6NJPBrS7ggG1DAMKl8gbjlJ06icD2l3BgFqGAYVL5A1HBrST4xhFNxjQkGBA22FA4RJ5g+7yQB0eFAyoZRhQuETeoLs8UIcHBQNqGQYULpE36C4P1OFBwYBahgGFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlGFC4RN4wTNHrS4AB7axgQC3DgMIl8oZBim7rP9eOIYp+MKAhwYC2w4DCJfKGIYp+/WRAuysYUMswoHCJvGGAomc/GdDuCgbUMgwoXCJv6K/o208GtLuCAbUMAwqXyBt6K3r3kwHtrmBALcOAwiXyhgEB7e3oe4f+MKAhwYC2w4DCJfIG3eWBOjwoGFDLMKBwibxBd3mgDg8KBtQyDChc0nP/sijKssjzIs+yYmOr21Ku96hwt1ek6aNHWV4UWZKkmbuQxXGaxfN5lCTxdBLlZe52yfI8mY7H09k8diTz8cW0ujCfuS3zKErc7Wk8j9LlIYvlozhmFANgQEOCAW2HAYVL+u1e5dN1MM/jJCuybL3VbXGVbPbIqyC6TMZJPE+Stx9kaVJfnmfpbJ7G0/PZbDwZj1+fzKeTWZ7ESRJNL8Znr3/jbHw2mc5ef/384t43J9Ozi/Pze+6vuevqfD6dzyczt2fitHXEi42HxYB2VjCglmFA4ZJee7twlXlVsCRLc9exrNma13POsqj3qOebbsqYJVGURtHiYZzG1YQzTuduhhnFk9nFNBpfvDabuCbOJ5nbb3YxuRjfu3j99en59PWLs4uLs/Fr96qCXpydzS8it9s0jtxsdBa5vYssLSs2CsqAdlYwoJZhQOGSPjuXy9N3d2LuAlqfkBf11mIZ0Hpi6HYo8jRxk85qzun+e/ggitx5eOTOyd05ezSbTiZn4+n5698cTybTyfjC5XV27uaa5/fujb5x5uah9yrOvvGNs9fPXr937/XxxcTVdeLuOJ9M5knm5rZpXgf0+iyeAe2sYEAtw4DCJX12biageR5V391cTUGbCWg9BW0moO78PUmjuC7ngwfxbJ7M3cn8fFYF9GI+vhhfXLx2fubmnfPz6SyJZ/cmZ+5kfTQafXP8DXcGX/33jW9+09X09fOze7Pz8eR8Np/OovE0cuYoz3enoAxoZwUDahkGFC7ps7NsQF0/X2NApRUMqGUYULikz86ip/DV/JOn8OIKBtQyDChc0mtvwReRXD/5IpIHBQNqGQYULum3u9gyJtdPLmNiQFEwoO0woHBJz/2lFtKPRlxIz4DCYEDbYUDhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZBhQukTfoLg/U4UHBgFqGAYVL5A26ywN1eFAwoJZhQOESeYPu8kAdHhQMqGUYULhE3nBYAflUZ0A7KxhQyzCgcIm84aCi/+8/anUAjnGbggENCAa0HQYULpE3HFJg+smAdlcwoJZhQOESecMBBaifDGh3BQNqGQYULpE37Feg+smAdlcwoJZhQOESecNeBayfDGh3BQNqGQYULpE3HAgozIE60AEFAxoQDGg7DChcIm/QXR6ow4OCAbUMAwqXyBt0lwfq8KBgQC3DgMIl8gbd5YE6PCgYUMswoHCJvEF3eaAODwoG1DIMKFwib9BdHqjDg4IBtQwDCpfIG24q4J/eDGhnBQNqGQYULpE33FDg1n+uHeDjtSkY0IBgQNthQOESecOuAt9PBrS7ggG1DAMKl8gbdhQC/WRAuysYUMswoHCJvGFbIdFPBrS7ggG1DAMKl8gbthQi/WRAuysYUMswoHCJvGEnoCIOiYPuKBjQgNAc0F/9+be+9b/887D7MqBwibxBd3mgDg8KBjRQ/ulv/vN/+Z9XV1/91ajia//roIMwoHCJvEF3eaAODwoGNEiabn776mej0R9+a3lxAAwoXCJv0F0eqMODggENkbqfX3N//rc//drfuqs/d9f+dsBxGFC4RN6guzxQhwcFAxoiv10G8/95dzT6Xr3hZ61T0C8//G5z6dXHjxeL73+yuwMDCpfIG3SXB+rwoGBAA6SagNbh/HT0x7+ut/zu3dWlTZ4tmoB++eGi4ju/3NmBAYVL5A1LheinNAPaWcGABsi//enoD/6+uvC7d7++s2WDV88Wq4A+W3zwydUXHy0++Gx7FwYUS1lclqtLRbmxOXcUS8r6trK66LaVVxtX0yQtyjyNJuNZWhRZEkezWRzPp9N5kmVZmsRJlucP346yPBmNRllZJLOZuyVNs7y8KrIsL7I0K1YHLJfa3O0QzeZpI75aC8vdh7nxT3VoiK336A0DGhJaA/pvf9rMO1sC+psfLVYB/fxxPff88sP3frq9DwMKxbXlaVE0l8rlpfpKnqdp7jKXu9IVmbsty8o8S5uqrq7GcZpFUTo7u5iMx/Mojidnk9nr9y4uzieTSeIiGLuNk7cexuML18/pfDabRdHFJHJhzbMkc8Wdpy60yfKA7k+lTeM0Gk/m82lci92DaoSri+uHuflPdWiIrffoDQMaEvoCunzN6Ktf/Z/7TuGfLxY/+JcmoM/XH3+4fSAGFIlrS/nU9WV5qawv1ZvdzDDPXeSyrJ515m5Dkbpt9dW8bK66+aX7U9VuOp1Nz2eRm3lO7k3u3RvPL8bRxTyO5un8Irr/YD51/Yzj8XgcJbNoMo1cNBOXzjxO48qTVgd0HufL0zibT+fzeZREcyd2uHTWtzcX1w9z65/q0BBb79EbBjQklAW0es3oe7sbvr69y/P3/+7qZRPOZ4sf1x9X19cwoEDKVUDr/+rONGfJ1czTTRGrU21XtSqa7nTd1a2+WsWsuurmkWkaRdN7F7PpdHJxdj4eT2bnr5299tr5+KKahc4iN488n95/a1LNP6P5+b3z2Xw2H4/dabybuCbVZNPNYZ2nOmZ1+LQ6ajyZzGZzN3udpnn10Nw8tKidy7nw6mFu/1MdGmLrPXrDgIaEtoBWr8L/5PrqV/+9fRlTE8xXHzWn7p8/Xn0T9J2GFwTG5dOGy+tL9eYnl4+ePFk8WiwWTx5dPnp0ebm4dFsePnmyvPrkSX31wWLx8OGDt984G7/51lvj8zfunb3x5ptnZ6/du3d+7803Xntz/MaDB+M33xw/eMP18+KNt98c3xu/+cb9t9584637j+7ff/Rg4Y7g/jxaPHlw6Y746NETd/3h4q033nrrrftv33f/XT556h7ME/fH8aS+uH6YPYco+O+oAgb0tPn5aON7nu6Mvn0hPQPqE48BHTOgJw4DeuL83+9uBfRr/3vbTjcDurOQiafwQPydwo/PznkK38XhQcFT+ED56v9dv2j01d/85OYa0Ir9M9AGBhSJvxeRzsdzvojUweFBwYAqhgHdMihaxuQmlVzGdLvDg4IBVQxfhd8yaFpIP3PzTi6kv83hQcGAKublzvpPrgOVl8gbdJcH6vCgYECD5ff/fHX1b3/+rZp/v/s+zpqXfCfSpiH4YdSfxsrLA3V4UDCggfKrP6tWLtUrmCq+3rbPKqCvPlq8z/fCBz+M5e8/Ul4eqMODggENk5+7r6Y//nUd0D/8VvUTlb/XstP6e55f8KcxhT+M5vfHKS8P1OFBwYAGyafuq+lPfr3+ISK/HbX9NLuNF42++Nj18/uf7e7AgMIlYkde/f5N5eWBOjwoGNAQqSae32suVAH96q/4E+lvNwQ9jPXvL1ZeHqjDg4IBDZFPV9/0XP0Yu0+H/VIkBhQuETru9e9/V14eqMODggENkfVPY1oFdM85/G0woHCJ0HGvf/+78vJAHR4UDGiAXJ+xrwL6u3dv/kT6DjCgcIm8QXd5oA4PCgY0QK5//vzqUtuv9OgAAwqXyBt0lwfq8KBgQAPkZi4Z0A4GDqOzw4NC9zAY0FNm/Ss91rT/Vs5bYUDhEnmD7vJAHR4UDGiArH+t8Zrf7nkv0i0woHCJvEF3eaAODwoGNEQ+3e3lz7iM6XZDkMO48amrvDxQhwcFAxoi7ox96xx+93pXGFC4BHy86/Wfa4Pu8kAdHhQMaIhU5/Ab3/Osrg45g2dA8RLs4W72U3t5oA4PCgY0SNyUc/RHq9/L+fs/Gw16DZ4BFZBAj9bST+3lgTo8KBjQMPmtK+joa//lv/3iF3/z70btv9S4AwwoXII8WFs/tZcH6vCgYEAD5Xd/Nrrmj4b1kwHFS4DHau2n9vJAHR4UDGiw/GqV0D9s/Z3GXWBA4RLgsVr7qb08UIcHBQMaMv/0i1/84v8asIB+BQMKl8gbdJcH6vCgYEAtw4DCJfIG3eWBOjwoGFDLMKBwibxBd3mgDg8KBtQyDChcIm/QXR6ow4OCAbUMAwqXyBt0lwfq8KBgQC3DgMIliIMc/HRVXh6ow4OCAbUMAwqXAI7Rvv5zbdBdHqjDg4IBtQwDCpccf4jD/dReHqjDg4IBtQwDCpccfYRb+qm9PFCHBwUDahkGFEhZFGUzjOpifXVFFkXZxo55vrytSJOsyJIky7Msy/MsTTPXz/Kque/mIao7ObLkwaK4qQUP5BJ8xBYY0JBgQNthQHEsm/lidTHLqqvNbS6fLqHrHasSVrdlrpzxJE6T+TxN0jiOk8T108W0PlRzxOs7pWkaz6PFwyS7oQUP5Cn2iG0woCHBgLbDgMJwHau4bC66QObuw7JDLp8VUbOju626tagmnWmUzJIkjudZnERJEo1GaTUZrQ6VLY9YrO6U5WkcxenDR26PXS2wd9URn0KP2AoDGhIMaDsMKIpyFdCyvlhUAa0+VufC2SqgWb1jsQxoUc0/M5fE2TyKo1kc1SSOdDkFzZaHrA5R3clNTN1MNU4eLtxMtNjR4s7iy1VAhc/iGdCQYEDbYUBRNCFzJ7+rCej1FLTp53IK2kxA3a1pUk9Ao3g6TyJX0LnrY+LO5+M0r6ageX3/5SGaCWgyj5J48TC7noKutLgJY33Ep9hJbRsMaEgwoO0woCgY0J4woCHBgLbDgKLgKXxPGNCQYEDbYUBhgF5EShO+iIRzeFAwoJZhQHEcuYxptFzGNI8zLmOCOTwoGFDLMKBAjlpIX63/rBfSV9NPLqQHOTwoGFDLMKBwybC73fb+zU2D7vJAHR4UDKhlGFC4ZNC9evRTe3mgDg8KBtQyDChcMuROffqpvTxQhwcFA2oZBhQuGXCfXv3UXh6ow4OCAbUMAwqXDLhPr35qLw/U4UHBgFqGAYVL5A26ywN1eFAwoJZhQOESeYPu8kAdHhQMqGUYULhE3qC7PFCHBwUDahkGFC6RN+guD9ThQcGAWoYBhUvkDbrLA3V4UDCglmFA4ZI+Ow/6tFReHqjDg4IBtQwDCpf02Lff+s+1QXd5oA4PCgbUMgwoXNJ912H91F4eqMODggG1DAMKl3Tec2A/tZcH6vCgYEAtw4DCJV13HNpP7eWBOjwoGFDLMKBwScf9BvdTe3mgDg8KBtQyDChc0nG/wf3UXh6ow4OCAbUMAwqXyBt0lwfq8KBgQC3DgMIl8gbd5YE6PCgYUMswoHCJvEF3eaAODwoG1DIMKFwib9BdHqjDg4IBtQwDCpfIG3SXB+rwoGBALcOAwiW37XD0p6Ly8kAdHhQMqGUYULjkltuHr/9cG3SXB+rwoGBALcOAwiWHbz6+n9rLA3V4UDCglmFA4ZKDtwL6qb08UIcHBQNqGQYULjl0I6Kf2ssDdXhQMKCWYUDhkgO3QfqpvTxQhwcFA2oZBhQuOXAbpJ/aywN1eFAwoJZhQOESeYPu8kAdHhQMqGUY0BVFlhWtN5RFUS4/5vnykrucZ3m5cUv1sb69KC7L6x3Wt+VJnKRpludZs7ne7pSOoszTtNm6Ml6b2oexMovBgHZWMKCWYUAbXMhcz1pucKlyuao+5nlVyHpblhd5lb7mlupjfbtr5NN6U73D+rYkSePpLInj2O1Qd7raniRFElV/0ixLN+q9aWofxuoxycGAdlYwoJZhQJdkRc3NgrpUVbhk5XUky6qK9cVqMrm8paJOXlXHJ9Wmeofq7/q2OE3dDDSauVymbo+8qI+a5nnkJqCRu83d2RV3bbw2tQ/jsnlMx/+L7IUB7axgQC3DgNYUq4DuRqlsAurymK+bWJ+q5/XZd3Wljlk1IXUVzPInRXX6vgzoMrFZXM0942g6i+LEZTdfHiTNUzf3TOdREqfb5/ZrU/uDfboKqOBZPAPaWcGAWoYBrWn6eXMK2vRzOcFsJobNBDRf9nEZ0Lz6FmrVxuwyd21sjpbWt8VZMnIT0Hg+rr4TWk1Bs+UENE6TLIlnabo5BW0moAemoJdPS/EpKAPaWcGAWoYBrREO6Gg0YkBvKBjQgGBA22FAa2RP4V0/eQp/U8GABgQD2g4DukTyRSTXT76I1KJgQAOCAW2HAW2QW8ZUnb9zGVOLggENCAa0HQZ0hdRC+vr971xI36JgQAOCAW2HAYVLdq5j3v++ZdBdHqjDg4IBtQwDCpfIG3SXB+rwoGBALcOAwiXyBt3lgTo8KBhQyzCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqMODggG1DAMKl8gbdJcH6vCgYEAtw4DCJasLYp9yyssDdXhQMKCWYUDhkuYj5vcftRp0lwfq8KBgQC3DgMIlyw9y/dReHqjDg4IBtQwDCpfUfwv2U3t5oA4PCgbUMgwoXFL9JdlP7eWBOjwoGFDLMKBwyZVwP7WXB+rwoGBALcOAwiVXEu9/3zLoLg/U4UHBgFqGAYVL5A26ywN1eFAwoJZhQOESeYPu8kAdHhQMqGXeeUEIwcOAmoAzULhE3qB76gZ1eFBwBmoZBhQukTfoLg/U4UHBgFqGAYUy0jEMBrSHggG1DAOKpFr/qWAYVwxoDwUDahkGFEi9fj78YdQODwrdw2BATcCA4li+/yj4YSwdHhS6h8GAmoABhdG8fzP0YTQODwrdw2BATcCAoli9/z3wYawcHhS6h8GAmoABRbF6/3vgw1g5PCh0D4MBNQEDCpfIG3SXB+rwoGBALcOAwiXyBt3lgTo8KBhQyzCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqMODggG1DAMKl8gbdJcH6vCgYEAtYzagZVGUbZcP0+xZf1jda7R99xfbt27fB4Ly8kAdHhQMqGWsBtTVzBXt5uXDNHvWH7LmXqPRaOvuL7Zu3b5PJ0mfYYjBgHZWMKCWMRpQV7OKYvfyYZo9s+qvvMjre9X93Lz75eat2/fpJOkzDDkY0M4KBtQyNgNarqJZbl8+TLPncnbpElldXfVzffeyCujq1qLcvE8nSZ9hCMKAdlYwoJaxGdCmmZtTxA6zw2bPenaZF0X1Yd3P9d2Lp+X61uqkfeM+qCmo8vJAHR4UDKhlGNBjAur6mTGgQxW6h8GAmsBmQFGn8KNRUezcnafwnRW6h8GAmsBmQIEvIt24O19E6qrQPQwG1ARGAwpcxrR7dy5j6qrQPQwG1ARWAwpcSH/FhfTDFLqHwYCawGxA5STyBt3lgTo8KBhQyzCgcIm8QXd5oA4PCgbUMgzoIA58OoU0jAMODwrdw2BATcCADmH1+49aJSDHfpSXB+rwoGBALcOADuBQPwMaxkGHB4XuYTCgJmBA+3Own+EM47DDg0L3MBhQEzCgvTncz2CGcYvDg0L3MBhQEzCgfbmln6EM4zaHB4XuYTCgJmBA+3JLP0MZxm0ODwrdw2BATcCAwiXyBt3lgTo8KBhQyzCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqMODggG1DAMKl8gbdJcH6vCgYEAtw4DCJfIG3eWBOjwoGFDLMKCd6fgpdOrD6OjwoNA9DAbUBAxoV25b/7mWHOHohvLyQB0eFAyoZRjQjnTt54kPo7PDg0L3MBhQEzCg3ejcz9MeRneHB4XuYTCgJmBAO9G9nyc9jB4ODwrdw2BATcCAdqFHP095GH0cHhS6h8GAmoAB7UKPfp7yMPo4PCh0D4MBNQEDCpfIG3SXB+rwoGBALcOAwiXyBt3lgTo8KBhQyzCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqMODggG1DAMKl8gbdJcH6vCgYEAtw4AeZMCnzSkOY4DDg0L3MBhQEzCgh+iz/nMt6X2P3gbd5YE6PCgYUMswoAcY0s8THMYghweF7mEwoCZgQPczqJ+nN4xhDg8K3cNgQE1gOaBlUZQH9u7cz+3jvLj1wMeivDxQhwcFA2oZwwF1lXOl27tz537uHOfFbQc+GuXlgTo8KBhQy9gNqKtcxd7Qde7nznFe3Hbgo1FeHqjDg4IBtYzZgJarzh15sn3jOE9BB96P8vJAHR4UDKhlzAa0ydzRM8Ubx7kEHXg/yssDdXhQMKCWYUAZ0FaHB4XuYTCgJjAbUJ7CH3Z4UOgeBgNqArMBvfVFpK7wRaShCt3DYEBNYDege1cb9f1U4TKmgQrdw2BATWA4oHvWu/d//xEX0g9T6B4GA2oCywFtZdj7Nzclx929i0F3eaAODwoG1DIM6DZH9/M0hnG8w4NC9zAYUBMwoFsc38+TGAbA4UGhexgMqAkY0E0A/TyFYSAcHhS6h8GAmoAB3QTQz1MYBsLhQaF7GAyoCRhQuETeoLs8UIcHBQNqGQYULpE36C4P1OFBwYBahgGFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZBrQG+OnBgHZV6B4GA2oCBrQCsf5zLYEdaa9Bd3mgDg8KBtQyDOgVtp8MaGeF7mEwoCZgQMH9ZEA7K3QPgwE1AQMK7icD2lmhexgMqAkYUHA/GdDOCt3DYEBNwICC+8mAdlboHgYDagIGFC6RN+guD9ThQcGAWoYBhUvkDbrLA3V4UDCglmFA4RJ5g+7yQB0eFAyoZRhQuETeoLs8UIcHBQNqGQYULpE36C4P1OFBwYBaxnBAhT4lGNCuCt3DYEBNYDeg6PWfa4nIUbcMussDdXhQMKCWMRtQqX4yoJ0VuofBgJrAakDF+smAdlboHgYDagKjAZXrJwPaWaF7GAyoKr78cFHznV9ub7cZUMF+MqCdFbqHwYCq4vPHDOhmQAUlcodeGXSXB+rwoGBALfBy8d3W7TYDCqEsirJNgnS0orw8UIcHBQNqgWeLH7ZuZ0CH4vLpEtoiATraUV4eqMODggE1wKuP3vtp6w0M6EBcPituFjSsYex1eFDoHgYDqokvP/zgH3+0WPzFJ7s3MKDDKFcBvXEWH9Qw9js8KHQPgwHVxOo1pMWPV1veaXhBhnD5tOHyrh8JOU0YUE28XCx+8NnVv368WJ/J2wzoCHUgBpQchgHVxPPmRfgbryXZOoXHrf/kKfzxCt3DYEA18nLxwWdbG0wFFLl+ni8iHa3QPQwGVCOfP95ZSW8poNj3H3EZ07EK3cNgQDXy+WO7M1DXTy6k7+zwoNA9DAZUEa8+al5+v/GGJDsBrfqpYBhX6ssDdXhQMKAGeLYM5zqkaywFVMUwrtSXB+rwoGBADfD542oZ0xc/2n0NyVBArziMPg4PCt3DYEBV8bz5YUy7b0ViQOESeYPu8kAdHhQMqAm++MvF4r0ffLa7mQGFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZAwG9fuqDHsaGQXd5oA4PCgbUMvoDuvH+o5CHsWnQXR6ow4OCAbWM+oBuvn8z4GFsGXSXB+rwoGBALaM9oFvvAZmwQAAAFpZJREFUfw93GNsG3eWBOjwoGFDLKA/o9s8PCXYYOwbd5YE6PCgYUMvoDujOz18KdRi7Bt3lgTo8KBhQy2gP6LYh0GHsGnSXB+rwoGBALaM7oLsGDqOzw4NC9zAYUBMwoHCJvEF3eaAODwoG1DIMKFwib9BdHqjDg4IBtQwDCpfIG3SXB+rwoGBALcOAwiXyBt3lgTo8KBhQyygNaPvTHdww9hh0lwfq8KBgQC2jM6B7fv9maMPYZ9BdHqjDg4IBtYzKgO77/cWBDWOvQXd5oA4PCgbUMhoDuvf3v4c1jP0G3eWBOjwoGFDLKAzo3n6GNYwDBt3lgTo8KBhQy+gL6P5+BjWMQwbd5YE6PCgYUMtoDOh+Q0DDOGTQXR6ow4OCAbWMvoAeMnAYnR0eFLqHwYCagAGFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZBhQukTfoLg/U4UHBgFpGUUBvf4qDGEYHg+7yQB0eFAyoZfQE9MD6z7UhgGF0MeguD9ThQcGAWkZNQDv0M4RhdDLoLg/U4UHBgFpGS0C79DOAYXQz6C4P1OFBwYBaRklAO/Xz9IfR0aC7PFCHBwUDahkdAe3Wz5MfRleD7vJAHR4UDKhltAS0m+HEh9HVoLs8UIcHBQNqGR0B7WrgMDo7PCh0D4MBNQEDCpfIG3SXB+rwoGBALcOAwiXyBt3lgTo8KBhQyzCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqMODggG1TOAB7fe0nuwwehp0lwfq8KBgQC0TdkA7rv9cG050GH0NussDdXhQMKCWCTqgPft5qsPobdBdHqjDg4IBtUzIAe3bzxMdRn+D7vJAHR4UDKhlAg5o736e5jAGGHSXB+rwoGBALRNuQPv38ySHMcSguzxQhwcFA2qZkAPa33CCwxhi0F0eqMODggG1TLgBHWLgMDo7PCh0D4MBNQEDCpfIG3SXB+rwoGBALcOAwiXyBt3lgTo8KBhQyzCgcIm8QXd5oA4PCgbUMgwoXCJv0F0eqMODggG1TIABHf5UntQwjjDoLg/U4UHBgFomvIAOWP+5NpzQMI4x6C4P1OFBwYBaJriAHtHPUxrGUQbd5YE6PCgYUMuEFtBj+nlCwzjOoLs8UIcHBQNqmcACelQ/T2cYRxp0lwfq8KBgQC0TVkCP6+fJDONYg+7yQB0eFAyoZUIL6HGGExnGsQbd5YE6PCgYUMuEFdBjDRxGZ4cHhe5hMKAmYEDhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZBhQukTfoLg/U4UHBgFqGAYVL5A26ywN1eFAwoJYJJKCYp+/OhwEy6C4P1OFBwYBaJoyAHrn+c21gQDs7PCh0D4MBNUEQAQX1866HATPoLg/U4UHBgFomhICi+smA9nB4UOgeBgNqggACCusnA9rD4UGhexgMqAlOP6C4fjKgPRweFLqHwYCaIISA4gwMaGeHB4XuYTCgJjj9gCINHEZnhweF7mEwoCZgQOESeYPu8kAdHhQMqGUYULhE3qC7PFCHBwUDahkGFC6RN+guD9ThQcGAWoYBhUvkDbrLA3V4UDCgljnhgOKfMga0u8ODQvcwGFATnG5Ages/1wYGtLPDg0L3MBhQE5xsQAX6yYD2cHhQ6B4GA2qCUw2oRD8Z0B4ODwrdw2BATXCiARXpJwPaw+FBoXsYDKgJTjOgMv1kQHs4PCh0D4MBNcGpBlTGwIB2dnhQ6B4GA2qC0wyolIHD6OzwoNA9DAbUBAwoXCJv0F0eqMODggG1DAMKl8gbdJcH6vCgYEAtw4DCJfIG3eWBOjwoGFDLMKBwibxBd3mgDg8KBtQyJxZQ2aeJAe3u8KDQPQwG1ASnFVCh9Z9rAwPa2eFBoXsYDKgJTiqgwv1kQHs4PCh0D4MBNcEpBVS6nwxoD4cHhe5hMKAmeOfFyeD6edcPgRAUDKgJTmcGKj7/5Ay0j8ODQvcwGFATnFJAxRUMaHeHB4XuYTCgJjidgCopj5JhMKCdFQyoZRhQuETeoLs8UIcHBQNqGQYULpE36C4P1OFBwYBahgGFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlTiCgq6dGR3mUDIMB7axgQC1z9wFdr//UUR4lw2BAOysYUMvceUCv18/rKI+SYTCgnRUMqGXuOqAb7z/SUR4lw2BAOysYUMvccUA337+pozxKhsGAdlYwoJa524Buvf9dR3mUDIMB7axgQC1z1wHdlMg4Ng0MaGeHB4XuYTCgJrjr74FuSuQNHEZnhweF7mEwoCZgQOESeYPu8kAdHhQMqGUYULhE3qC7PFCHBwUDahkGFC6RN+guD9ThQcGAWoYBhUvkDbrLA3V4UDCglrmjgLY9HTrKo2QYDGhnBQNqmbsJaOvvP9JRHiXDYEA7KxhQy9xJQNt/f5yO8igZBgPaWcGAWuYuArrn92/qKI+SYTCgnRUMqGXuIKD7fn+xjvIoGQYD2lnBgFrGf0D3/v53HeVRMgwGtLOCAbXMXQR0nwTn2GdgQDs7PCh0D4MBNQHXgcIl8gbd5YE6PCgYUMswoHCJvEF3eaAODwoG1DIMKFwib9BdHqjDg4IBtQwDCpfIG3SXB+rwoGBALcOAwiXyBt3lgTo8KBhQy3gM6G1PgY7yKBkGA9pZwYBaxl9A967/XEuOd9wCA9rd4UGhexgMqAm8BfTWfiopj5JhMKCdFQyoZXwF9PZ+KimPkmEwoJ0VDKhlPAW0Qz+VlEfJMBjQzgoG1DJ+Atqln0rKo2QYDGhnBQNqGV8B7SI5ztHFwIB2dnhQ6B4GA2oCrgOFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZBhQukTfoLg/U4UHBgFqGAYVL5A26ywN1eFAwoJYRDmiff3Yd5VEyDAa0s4IBtYxsQDut/1xLhjl6wIB2d3hQ6B4GA2oC0YD26qeS8igZBgPaWcGAWkYyoP36qaQ8SobBgHZWMKCWEQxoz34qKY+SYTCgnRUMqGXkAtq3n0rKo2QYDGhnBQNqGcmA9ryDjvIoGQYD2lnBgFqG60DhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZBhQukTfoLg/U4UHBgFqGAYVL5A26ywN1eFAwoJZhQOES8PHKoih3DLrLA3V4UDCglhEI6NB/aga0DZdPl9Btg+7yQB0eFAyoZfAB7b3+cy0Zdrc+hvAC6vJZsVVQ5eWBOjwoGFDLwAM6uJ8MaAvlKqCbZ/HKywN1eFAwoJZBB3R4PxnQFpp+bk9BlZcH6vCgYEAtAw7oEf1kQFtgQI90eFAwoJbBBvSYfjKgLfAU/kiHBwUDahl0QI94KAxoC3wR6TiHBwUDahmuA4VLsIfjMqajHB4UDKhlGFC4BHw8LqQ/xuFBwYBahgGFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZUEAR/7w6yqNkGAxoZwUDahlMQI9a/7mWHH+I2wwMaGeHB4XuYTCgJoAEFNJPJeVRMgwGtLOCAbUMIqCYfiopj5JhMKCdFQyoZQABBfVTSXmUDIMB7axgQC1zfEBR/VRSHiXDYEA7KxhQyyACCnooOsqjZBgMaGcFA2oZrgOFS+QNussDdXhQMKCWYUDhEnmD7vJAHR4UDKhlGFC4RN6guzxQhwcFA2oZBhQukTfoLg/U4UHBgFqGAYVL5A26ywN1eFAwoJY5IqDof1Id5VEyDAa0s4IBtczwgMLWf64l2MO1GRjQzg4PCt3DYEBNMDig8H4qKY+SYTCgnRUMqGWGBhTfTyXlUTIMBrSzggG1zMCACvRTSXmUDIMB7axgQC0zLKAS/VRSHiXDYEA7KxhQywwNqMBD0VEeJcNgQDsrGFDLcB0oXCJv0F0eqMODggG1DAMKl8gbdJcH6vCgYEAtw4DCJfIG3eWBOjwoGFDLMKBwibxBd3mgDg8KBtQyDChcIm/QXR6ow4OCATXBq48fLxbf/2R3c8+ASv4z6iiPkmEwoJ0VDKgFvvxwUfGdX+5s7xdQkfWfa4ncoVcGBrSzw4NC9zAYUFU8W3zwydUXHy0++Gx7e9eAlkVRVv0st7bXW6sPeV6Uu9ubGzvjpTwtD2rf42zbfr1tPfTdnV607r6fvv9M6ssDdXhQMKAG+PxxPff88sP3frp9Q8eAXhZlWVT9LIqNzUW1tXAfcsfGLfX2bHljd3wEtLj5oFo27d1+vW099Bs7vWjbfT9d9tlBeXmgDg8KBtQAzxffbT7+cPuGbs/y5dOyLKt+OjY6WdZkpYuni+j6lnp77jZs7X0rHgJ6uXzEW/8ncHPT3u3X29ZDv7nTi4OH6KK5dRi6ywN1eFAwoAZ4tvhx/fFlE9I1nZ7lsgqo62defbmvTzjL5Rd/keXLgK5ORevt7ur23rcj/8n+dBXQ6wdVFjc27d1+vW099OLmnV8cOsQuXfa5gfLyQB0eFAyofl591Jy6f/549U3QdxpedODyqWM0urx8Ul243Nz69OmTy8VlzZPmlsvl1p29T4HmEW8+qJZNe7dfb1sP/UnrnQ8fuu8+JEgYUEUgAnojiQwoA0r2woAqYiOgOwuZup/C3zgp5yk8T+GPUugeBgOqiJYZaEOPF5FuvCzEF5H4ItIxCt3DYEAVcWxAl8uYbixM4jImLmM6QqF7GAyoJo57FX61kP7Gmm8upOdC+uEK3cNgQDWxWv85ZB3oiO+B7CWRN+guD9ThQcGAGuCIdyJV739neXpI5A26ywN1eFAwoAZ49dHi/WHvha9/fgjL00Mib9BdHqjDg4IBtcAXA38a0/LnL7E8PSTyBt3lgTo8KBhQE3zxsevn9z/b3XzLs9z8/DqWp4dE3qC7PFCHBwUDapnDz/Lq53+yPD0k8gbd5YE6PCgYUMvcFtDlR5anh0TeoLs8UIcHBQNqGf5OJLhE3qC7PFCHBwUDahkGFC6RN+guD9ThQcGAWoYBhUvkDbrLA3V4UDCglmFA4RJ5g+7yQB0eFAyoZRhQuETeoLs8UIcHBQNqmT3P8s4/F8vTQyJv0F0eqMODggG1TPuzvPv731meHhJ5g+7yQB0eFAyoZVqf5d1+sjx9JPIG3eWBOjwoGFDLtD3LN/rJ8vSRyBt0lwfq8KBgQC3T8izf7CfL00cib9BdHqjDg4IBtczNZ7mlnyxPH4m8QXd5oA4PCgbUMm0BvbkXy9NDIm/QXR6ow4OCAbUM14HCJfIG3eWBOjwoGFDLMKBwibxBd3mgDg8KBtQyDChcIm/QXR6ow4OCAbUMAwqXyBt0lwfq8KBgQC3DgMIl8gbd5YE6PCgYUMtsPMsH/olYnh4SeYPu8kAdHhQMqGWun+W29Z8rWJ4eEnmD7vJAHR4UDKhl1s/yoX6yPH0k8gbd5YE6PCgYUMusnuWD/WR5+kjkDbrLA3V4UDCglmme5cP9ZHn6SOQNussDdXhQMKCWWT7Lt/ST5ekjkTfoLg/U4UHBgFpmFdDDe7E8PSTyBt3lgTo8KBhQy3AdKFwib9BdHqjDg4IBtQwDCpfIG3SXB+rwoGBALfMOIUSEu/7ahsKAtnPXn2SEaOWuv7ahMKDHoOSTgcM4JTiMkGBAj0HJJwmHcUpwGCHBgB6Dkk8SDuOU4DBCggE9BiWfJBzGKcFhhAQDegxKPkk4jFOCwwgJBvQYlHyScBinBIcREgzoMSj5JOEwTgkOIyQYUEIIGQgDSgghA2FACSFkIAwoIYQMhAElhJCBMKCEEDIQBpQQQgbCgBJCyEAY0MG8+vjxYvH9T+76YRzJlx8uar7zy7t+JEfw5YffbS4F/aSshxHwk/Kbv1ws3ls9AUE/G91gQIfSfJIH+Dm+xeePg/1avebZYrs8gQ5mPYxwn5R/WD7w935aXQn72egGAzqUZ4sPPrn64qPFB5/d9SM5iperL9pwefVssRpEyE/KxjCCfVJeLt77r1fVE1BHM+RnoysM6EA+f1x/jnz54fL/bIPl2eKHd/0QjuQ3P1qsyhPyk7IxjGCflFcfLX5cfXRTzx+H/Wx0hgEdyPPmk/15oJ/rDa8+Cv2z+/li8YN/WT8ZwT4pm8MI9kn58sPmdL3+f4CAn43uMKADebb8/9pwz7aWfPnhB//opj5/Ee43+p+//3frJyHgJ2VzGOE/KXVAA342usOADmM9Sfj8cdDf4Vm9XNF8rgdK8yUa+pPycv2diMCflPqsPfRnoxsM6DC0fHa8dGeOn13968eLQE8alygLaPBPSn3yHvqz0Q0GdBgbnx1Br9J4vj75Dfn7VDcDGuST8nLnW7mhPikv6/KH/mx0gwEdhrb/e30Z9FoTZTPQ6+thDuPxe9X3HkJ/NrrBgA5D22dH2LMEpQEN80l53nznIfRnoxsM6ECUvcQY9ie5glfhK24GNMAn5R/W37kN/NnoBgM6kNXitrAXua1WPgf+Sf5yZ8VhoE/KeiId7pPy6tni/dWsOfBnoxsM6ECUvM3i2c7XbJhcr/8J+km5nkgH+6Q82/i2beDPRjcY0IG4z+73FbzR9/PH1YqZL34U9jBW5Qn8SdlYBxrok/J88yEH/mx0gwEdyhc6ftTM8+bn/oT7rperjXPdsJ+U9TBCfVJWP4aveVd/2M9GNxjQwXzxsfvk+H7w/+f6RfUDHH8Q9jCuv1kY9JOyMYwwn5SXi62Ahv1sdIMBJYSQgTCghBAyEAaUEEIGwoASQshAGFBCCBkIA0oIIQNhQAkhZCAMKCGEDIQBJYSQgTCghBAyEAaUEEIGwoASQshAGFBCCBkIA0p08+noD/7+rh8DUQsDSnTDgBJBGFCiGwaUCMKAEt0woEQQBpTohgElgjCgRDcMKBGEASXh8G9/Ovr2V//j3dHoj35SX//qr0bf+9WfjUZ/+Lfuyu//2t3wtf/4P1c7/+rP3dX/9GsGlAjCgJJwcAH9k78a1fzxr6/qgP7n6kqVyE9HDf+p3vWrZr8/+GsGlMjBgJJwcAEdjf7jP1999fPR6OtXy0p+7W+vfv+Tup/V5PP/+3lT0J+5j7+ud2RAiRwMKAmHKqBfry/9rApnHdDv1dd/925zgytpdYu7/u3mKgNK5GBASTi4gDY1dJe+Xge0uX79nU637etVYK93ZECJGAwoCYdlNmt+Vn0X1MWy/l5oU83rWzau/4wBJXIwoCQcqlfhm4t1F9edrL85uuYP/n6jtHwVngjCgJJwcF38XnPx09sC+u3NHQmRgQEl4XBoBvr1nR05AyUeYEBJOGwFdPk90GUn198MbeD3QIkfGFASDi6gTSeXKb3u5HJZU8Wypet55/UL9YTgYUBJOFTf6lxOQdfrQJuA/u7dVVp/Wy8NXa8L5TpQIgkDSgLg0+WC+fq1oj/59dXv/3oZ0o0z9U+Xb5D/6r837/JcvjOJ70QisjCgJACuA/of3l2+0l5PRDeXf67fC9/MRH++vPZH/wcDSuRgQEkAXAf029Xsc9T8zKXNgLpp6b9zt/z7n6yu/xN/GhMRhwEl4bDxKjwhpwADSsKBASUnBgNKwoEBJScGA0rCgQElJwYDSsKBASUnBgNKwoEBJScGA0oIIQNhQAkhZCAMKCGEDIQBJYSQgTCghBAyEAaUEEIGwoASQshAGFBCCBkIA0oIIQNhQAkhZCAMKCGEDIQBJYSQgTCghBAyEAaUEEIG8v8D0Rf8QpFizb0AAAAASUVORK5CYII=" width="672" /></p>
-<pre class="r"><code>grades_metrics2 &lt;- metric_set(rmse, rsq, mae)
+<pre class="r"><code># our metrics
+grades_metrics2 &lt;- metric_set(rmse, rsq, mae)
 grades_metrics2(grades_train_res2, truth = G3, 
                 estimate = .pred)</code></pre>
 <pre><code>## # A tibble: 3 × 3
@@ -744,102 +827,109 @@ grades_metrics2(grades_train_res2, truth = G3,
 ## 1 rmse    standard       1.21 
 ## 2 rsq     standard       0.860
 ## 3 mae     standard       0.762</code></pre>
+<p>From our two linear regression models above, we see that both have
+values of rmse of greater than 1. This shows that the model didn’t
+perform particularly well, or isn’t optimized well. For reference, the
+closer rmse is to 0, the better our model is. We also have a high mae,
+which isn’t super great because the closer mae is to 0, the better.
+Between the two, it looks like Method 2. Portuguese for training and
+Maths for testing gave us better predictions. Let’s try some
+classification methods now, and see if they are better at
+predicting.</p>
 </div>
 <div id="k-fold-cross-validation" class="section level4">
 <h4>k-fold cross validation</h4>
-<pre class="r"><code>grades_folds &lt;- vfold_cv(grades_train, v = 10, strata = G3)
-grades_folds
+<pre class="r"><code>#grades_folds &lt;- vfold_cv(grades_train, v = 10, strata = G3)
 
 # lm engine
-lm_model &lt;- linear_reg() %&gt;% 
-  set_engine(&quot;lm&quot;)
+#lm_model &lt;- linear_reg() %&gt;% 
+#  set_engine(&quot;lm&quot;)
 # create workflow
-lm_wflow &lt;- workflow() %&gt;% 
-  add_model(lm_model) %&gt;% 
-  add_recipe(grades_recipe1)
+#lm_wflow &lt;- workflow() %&gt;% 
+#  add_model(lm_model) %&gt;% 
+#  add_recipe(grades_recipe1)
 
-fit_lm_kfold &lt;- fit_resamples(lm_wflow,
-                        grades_folds,
-                        control = control_resamples(save_pred = TRUE)
-                        )
-collect_metrics(fit_lm_kfold)
+#fit_lm_kfold &lt;- fit_resamples(lm_wflow,
+#                        grades_folds,
+#                        control = control_resamples(save_pred = TRUE)
+#                        )
+#collect_metrics(fit_lm_kfold)
 
-final_fit &lt;- fit(lm_wflow, grades_train)
-final_fit
+#final_fit &lt;- fit(lm_wflow, grades_train)
 
-grades_predicted &lt;- predict(final_fit, new_data = grades_train)
-grades_predicted &lt;- bind_cols(grades_predicted, grades_train %&gt;% select(G3))
-grades_predicted
+#grades_predicted &lt;- predict(final_fit, new_data = grades_train)
+#grades_predicted &lt;- bind_cols(grades_predicted, grades_train %&gt;% select(G3))
+#grades_predicted
 
-grades_predicted_test &lt;- predict(final_fit, new_data = grades_test)
-grades_predicted_test &lt;- bind_cols(grades_predicted_test, grades_test %&gt;% select(G3))
-grades_predicted_test
+#grades_predicted_test &lt;- predict(final_fit, new_data = grades_test)
+#grades_predicted_test &lt;- bind_cols(grades_predicted_test, grades_test %&gt;% select(G3))
+#grades_predicted_test
 
 # check average accuracy on test data
-grades_metrics &lt;- metric_set(rmse, rsq, mae)
-grades_metrics(grades_predicted, truth = G3, 
-                estimate = .pred)
-grades_metrics(grades_predicted_test, truth = G3, 
-                estimate = .pred)</code></pre>
-<pre class="r"><code>grades_folds2 &lt;- vfold_cv(grades_train2, v = 10, strata = G3)
-grades_folds2
+#grades_metrics &lt;- metric_set(rmse, rsq, mae)
+#grades_metrics(grades_predicted, truth = G3, 
+#                estimate = .pred)
+#grades_metrics(grades_predicted_test, truth = G3, 
+#                estimate = .pred)</code></pre>
+<pre class="r"><code>#grades_folds2 &lt;- vfold_cv(grades_train2, v = 10, strata = G3)
 
 # lm engine
-lm_model &lt;- linear_reg() %&gt;% 
-  set_engine(&quot;lm&quot;)
+#lm_model &lt;- linear_reg() %&gt;% 
+#  set_engine(&quot;lm&quot;)
 # create workflow
-lm_wflow2 &lt;- workflow() %&gt;% 
-  add_model(lm_model) %&gt;% 
-  add_recipe(grades_recipe2)
+#lm_wflow2 &lt;- workflow() %&gt;% 
+#  add_model(lm_model) %&gt;% 
+#  add_recipe(grades_recipe2)
 
-fit_lm2_kfold &lt;- fit_resamples(lm_wflow2,
-                        grades_folds2,
-                        control = control_resamples(save_pred = TRUE)
-                        )
-collect_metrics(fit_lm2_kfold)
+#fit_lm2_kfold &lt;- fit_resamples(lm_wflow2,
+#                        grades_folds2,
+#                        control = control_resamples(save_pred = TRUE)
+#                        )
+#collect_metrics(fit_lm2_kfold)
 
-final_fit2 &lt;- fit(lm_wflow2, grades_train2)
-final_fit2
+#final_fit2 &lt;- fit(lm_wflow2, grades_train2)
 
-grades_predicted2 &lt;- predict(final_fit2, new_data = grades_train2)
-grades_predicted2 &lt;- bind_cols(grades_predicted2, grades_train2_nocourse %&gt;% select(G3))
-grades_predicted2
+#grades_predicted2 &lt;- predict(final_fit2, new_data = grades_train2)
+#grades_predicted2 &lt;- bind_cols(grades_predicted2, grades_train2_nocourse %&gt;% select(G3))
+#grades_predicted2
 
-grades_predicted2_test &lt;- predict(final_fit2, new_data = grades_test2)
-grades_predicted2_test &lt;- bind_cols(grades_predicted2_test, grades_test2_nocourse %&gt;% select(G3))
-grades_predicted2_test
+#grades_predicted2_test &lt;- predict(final_fit2, new_data = grades_test2)
+#grades_predicted2_test &lt;- bind_cols(grades_predicted2_test, grades_test2_nocourse %&gt;% select(G3))
+#grades_predicted2_test
 
 # check average accuracy on test data
-grades_metrics &lt;- metric_set(rmse, rsq, mae)
-grades_metrics(grades_predicted, truth = G3, 
-                estimate = .pred)
-grades_metrics(grades_predicted2, truth = G3, 
-                estimate = .pred)</code></pre>
+#grades_metrics &lt;- metric_set(rmse, rsq, mae)
+#grades_metrics(grades_predicted, truth = G3, 
+#                estimate = .pred)
+#grades_metrics(grades_predicted2, truth = G3, 
+#                estimate = .pred)</code></pre>
 </div>
 </div>
 <div id="classification" class="section level3">
 <h3>Classification</h3>
-<p>Before we try fitting classification methods, there is one issue we
-should pay attention to. Earlier, we made a histogram of the
-distribution of G3 grades in the Maths and Portuguese classes. There
-were a large number of students who received G3 grades between 0, 5 and
-15 than any other grade. For classification methods, we will need to
-convert G3 grades to a factor type. However, because some grades were
-“more common” (earned by more students than others), there may not be
-enough student grades data in each “grade category”. (ex. students who
-got grade 0, grade 1, grade 2, etc.) As we split the data and merge, we
-see below that this insufficiency of grades in each “category” creates
-inbalanced factor levels among the training and testing datasets. This
-will make it difficult to train any classification model, because when
-it comes to testing, should there be an observation with a G3 grade that
-did not show up in training, the model would not accurately recognize or
-predict the grade. It is important to keep this in mind, because having
-imbalanced factor levels will strongly impact the accuracy and results
-from any classification model we fit (seen later on). <em>CORRECT THIS
-PART, TALK ABOUT CONCERNS + HOW TO FIX</em></p>
-<pre class="r"><code># convert outcome variable to factor first!!!
+<p>Before we try fitting classification methods, we should remember the
+issue discussed earlier. For classification methods, we will need to
+convert G3 grades to a factor type with different levels. However,
+because some grades were “more common” (earned by more students than
+others), there may not be enough student grades data in each “grade
+category”. (ex. grade 0, grade 1, grade 2, etc.) If we create a level
+for each individual grade, we will run into the problem of
+disproportionate categories. Instead, (advised by my TA Hanmo) we can
+group the G3 grades into two levels of “Pass” and “Fail.” The split
+between “Pass” and “Fail” is arbitrarily decided, it can be changed
+depending on the context/use of the model. I simply chose to group
+grades 0-10 as “Fail”, and grades 11-20 as “Pass.” Creating two new
+factor levels will hopefully remedy our problem of not having enough
+student grades in each category/level, because we are grouping much more
+data together.</p>
+<p>Before we fit any models however, we need to convert our outcome
+variable G3 into a factor and give it the new levels of “Pass” and
+“Fail.” Again, we do this for the dataset that has course labels, and
+the dataset without course labels. Be sure to check that the new factor
+levels have been assigned correctly!</p>
+<pre class="r"><code># convert outcome variable to factor first
 
-# dataset without course labels
+# Method 1. dataset without course labels
 all_classes_fctr &lt;- all_classes %&gt;% mutate(G3 = factor(G3))
 all_classes_fctr$G3 %&gt;% head()</code></pre>
 <pre><code>## [1] 6  6  10 15 10 15
@@ -851,37 +941,11 @@ levels(all_classes_fctr$G3) &lt;- list(&quot;Fail&quot;=&quot;0&quot;, &quot;Fai
 all_classes_fctr$G3 %&gt;% head()</code></pre>
 <pre><code>## [1] Fail Fail Fail Pass Fail Pass
 ## Levels: Fail Pass</code></pre>
-<pre class="r"><code># dataset with course labels
+<pre class="r"><code># Method 2. dataset with course labels
 all_classes2_fctr &lt;- all_classes2 %&gt;% mutate(G3 = factor(G3))
-all_classes2_fctr %&gt;% head()</code></pre>
-<pre><code>##   school sex age address famsize Pstatus Medu Fedu     Mjob     Fjob     reason
-## 1     GP   F  18       U     GT3       A    4    4  at_home  teacher     course
-## 2     GP   F  17       U     GT3       T    1    1  at_home    other     course
-## 3     GP   F  15       U     LE3       T    1    1  at_home    other      other
-## 4     GP   F  15       U     GT3       T    4    2   health services       home
-## 5     GP   F  16       U     GT3       T    3    3    other    other       home
-## 6     GP   M  16       U     LE3       T    4    3 services    other reputation
-##   guardian traveltime studytime failures schoolsup famsup paid activities
-## 1   mother          2         2        0       yes     no   no         no
-## 2   father          1         2        0        no    yes   no         no
-## 3   mother          1         2        3       yes     no  yes         no
-## 4   mother          1         3        0        no    yes  yes        yes
-## 5   father          1         2        0        no    yes  yes         no
-## 6   mother          1         2        0        no    yes  yes        yes
-##   nursery higher internet romantic famrel freetime goout Dalc Walc health
-## 1     yes    yes       no       no      4        3     4    1    1      3
-## 2      no    yes      yes       no      5        3     3    1    1      3
-## 3     yes    yes      yes       no      4        3     2    2    3      3
-## 4     yes    yes      yes      yes      3        2     2    1    1      5
-## 5     yes    yes       no       no      4        3     2    1    2      5
-## 6     yes    yes      yes       no      5        4     2    1    2      5
-##   absences G1 G2 G3 course
-## 1        6  5  6  6  Maths
-## 2        4  5  5  6  Maths
-## 3       10  7  8 10  Maths
-## 4        2 15 14 15  Maths
-## 5        4  6 10 10  Maths
-## 6       10 15 15 15  Maths</code></pre>
+all_classes2_fctr$G3 %&gt;% head()</code></pre>
+<pre><code>## [1] 6  6  10 15 10 15
+## Levels: 0 1 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20</code></pre>
 <pre class="r"><code># if G3 between 0 and 10, level = Fail, if G3 between 11 and 20, level = Pass
 levels(all_classes2_fctr$G3) &lt;- list(&quot;Fail&quot;=&quot;0&quot;, &quot;Fail&quot;=&quot;1&quot;, &quot;Fail&quot;=&quot;4&quot;, &quot;Fail&quot;=&quot;5&quot;, &quot;Fail&quot;=&quot;6&quot;, &quot;Fail&quot;=&quot;7&quot;, &quot;Fail&quot;=&quot;8&quot;, &quot;Fail&quot;=&quot;9&quot;, &quot;Fail&quot;=&quot;10&quot;, &quot;Pass&quot;=&quot;11&quot;, &quot;Pass&quot;=&quot;12&quot;, &quot;Pass&quot;=&quot;13&quot;, &quot;Pass&quot;=&quot;14&quot;, &quot;Pass&quot;=&quot;15&quot;, &quot;Pass&quot;=&quot;16&quot;, &quot;Pass&quot;=&quot;17&quot;, &quot;Pass&quot;=&quot;18&quot;, &quot;Pass&quot;=&quot;19&quot;, &quot;Pass&quot;=&quot;20&quot;)
 
@@ -889,6 +953,9 @@ levels(all_classes2_fctr$G3) &lt;- list(&quot;Fail&quot;=&quot;0&quot;, &quot;Fa
 all_classes2_fctr$G3 %&gt;% head()</code></pre>
 <pre><code>## [1] Fail Fail Fail Pass Fail Pass
 ## Levels: Fail Pass</code></pre>
+<p>We take our datasets with the new factor outcome variable and split
+it with two different ways, just like we did above. (1. large merged
+dataset, 2. Portuguese=training, Maths=testing)</p>
 <pre class="r"><code># Method 1. merged dataset
 # split data into training/testing
 grades_split_fctr &lt;- initial_split(all_classes2_fctr, prop = 0.7,
@@ -905,20 +972,28 @@ grades_split2_fctr &lt;- group_initial_split(all_classes2_fctr, group = course,
 grades_train2_fctr &lt;- training(grades_split2_fctr)
 # use Maths for testing
 grades_test2_fctr &lt;- testing(grades_split2_fctr)</code></pre>
-<p>We can try out a couple of classification models anyway, just to see
-how they perform.</p>
-<div id="logistic-regression-model-merged-dataset" class="section level4">
-<h4>1. Logistic Regression Model (merged dataset)</h4>
-<pre class="r"><code># logistic regression engine
-log_reg &lt;- logistic_reg() %&gt;% 
-  set_engine(&quot;glm&quot;)</code></pre>
-<pre class="r"><code># test out a logistic regression model on our merged dataset
+<p>Let’s make 2 recipes (same as above) for the classification models
+with the data, except this time our outcome G3 is a factor.</p>
+<pre class="r"><code>grades_recipe1_fctr &lt;- recipe(G3 ~ ., data=all_classes2_fctr) %&gt;%
+  step_dummy(all_nominal_predictors())
 
-# create workflow and add recipe
+grades_recipe2_fctr &lt;- recipe(G3 ~ ., data=all_classes_fctr) %&gt;%
+  step_dummy(all_nominal_predictors())</code></pre>
+<p>For the classification models, let’s begin with logistic regression.
+Then we’ll try linear discriminant analysis (LDA) and quadratic
+discriminant analysis (QDA).</p>
+<div id="logistic-regression-model-method-1.-merged-dataset" class="section level4">
+<h4>Logistic Regression Model (Method 1. merged dataset)</h4>
+<pre class="r"><code># test out a logistic regression model on our merged dataset
+log_reg &lt;- logistic_reg() %&gt;% 
+  set_engine(&quot;glm&quot;)
+
+# create workflow
 log_wkflow &lt;- workflow() %&gt;% 
   add_model(log_reg) %&gt;% 
-  add_recipe(grades_recipe1)
+  add_recipe(grades_recipe1_fctr)
 
+# fit
 log_fit &lt;- fit(log_wkflow, grades_train_fctr)
 log_fit %&gt;% 
   tidy()</code></pre>
@@ -936,7 +1011,8 @@ log_fit %&gt;%
 ##  9 freetime     -0.0659      0.179   -0.368  0.713     
 ## 10 goout         0.254       0.171    1.48   0.138     
 ## # … with 33 more rows</code></pre>
-<pre class="r"><code>predict(log_fit, new_data = grades_train_fctr, type = &quot;prob&quot;)</code></pre>
+<pre class="r"><code># predictions
+predict(log_fit, new_data = grades_train_fctr, type = &quot;prob&quot;)</code></pre>
 <pre><code>## # A tibble: 730 × 2
 ##    .pred_Fail  .pred_Pass
 ##         &lt;dbl&gt;       &lt;dbl&gt;
@@ -951,13 +1027,15 @@ log_fit %&gt;%
 ##  9      0.989 0.0106     
 ## 10      0.996 0.00389    
 ## # … with 720 more rows</code></pre>
-<pre class="r"><code>augment(log_fit, new_data = grades_train_fctr) %&gt;%
+<pre class="r"><code># confusion matrix
+augment(log_fit, new_data = grades_train_fctr) %&gt;%
   conf_mat(truth = G3, estimate = .pred_class)</code></pre>
 <pre><code>##           Truth
 ## Prediction Fail Pass
 ##       Fail  236   28
 ##       Pass   32  434</code></pre>
-<pre class="r"><code>log_reg_acc &lt;- augment(log_fit, new_data = grades_train_fctr) %&gt;%
+<pre class="r"><code># accuracy
+log_reg_acc &lt;- augment(log_fit, new_data = grades_train_fctr) %&gt;%
   accuracy(truth = G3, estimate = .pred_class)
 log_reg_acc</code></pre>
 <pre><code>## # A tibble: 1 × 3
@@ -965,16 +1043,19 @@ log_reg_acc</code></pre>
 ##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
 ## 1 accuracy binary         0.918</code></pre>
 </div>
-<div id="logistic-regression-model-portuguese-data-for-training-maths-data-for-testing" class="section level4">
-<h4>2. Logistic Regression Model (Portuguese data for training, Maths
-data for testing)</h4>
+<div id="logistic-regression-model-method-2.-portuguese-for-training-maths-for-testing" class="section level4">
+<h4>Logistic Regression Model (Method 2. Portuguese for training, Maths
+for testing)</h4>
 <pre class="r"><code># test out a logistic regression model on our second dataset (using Portuguese for training, Maths for testing)
+log_reg &lt;- logistic_reg() %&gt;% 
+  set_engine(&quot;glm&quot;)
 
 # create workflow
 log_wkflow2 &lt;- workflow() %&gt;% 
   add_model(log_reg) %&gt;% 
-  add_recipe(grades_recipe2) # recipe from before
+  add_recipe(grades_recipe2_fctr)
 
+# fit
 log_fit2 &lt;- fit(log_wkflow2, grades_train2_fctr)
 log_fit2 %&gt;% 
   tidy()</code></pre>
@@ -992,7 +1073,8 @@ log_fit2 %&gt;%
 ##  9 freetime     -0.0761     0.186   -0.409  0.683      
 ## 10 goout         0.154      0.189    0.817  0.414      
 ## # … with 32 more rows</code></pre>
-<pre class="r"><code>predict(log_fit2, new_data = grades_train2_fctr, type = &quot;prob&quot;)</code></pre>
+<pre class="r"><code># predict
+predict(log_fit2, new_data = grades_train2_fctr, type = &quot;prob&quot;)</code></pre>
 <pre><code>## # A tibble: 649 × 2
 ##    .pred_Fail .pred_Pass
 ##         &lt;dbl&gt;      &lt;dbl&gt;
@@ -1007,13 +1089,15 @@ log_fit2 %&gt;%
 ##  9 0.00000121      1.00 
 ## 10 0.0174          0.983
 ## # … with 639 more rows</code></pre>
-<pre class="r"><code>augment(log_fit2, new_data = grades_train2_fctr) %&gt;%
+<pre class="r"><code># confusion matrix
+augment(log_fit2, new_data = grades_train2_fctr) %&gt;%
   conf_mat(truth = G3, estimate = .pred_class)</code></pre>
 <pre><code>##           Truth
 ## Prediction Fail Pass
 ##       Fail  176   23
 ##       Pass   21  429</code></pre>
-<pre class="r"><code>log_reg_acc2 &lt;- augment(log_fit2, new_data = grades_train2_fctr) %&gt;%
+<pre class="r"><code># accuracy
+log_reg_acc2 &lt;- augment(log_fit2, new_data = grades_train2_fctr) %&gt;%
   accuracy(truth = G3, estimate = .pred_class)
 log_reg_acc2</code></pre>
 <pre><code>## # A tibble: 1 × 3
@@ -1021,22 +1105,23 @@ log_reg_acc2</code></pre>
 ##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
 ## 1 accuracy binary         0.932</code></pre>
 </div>
-<div id="linear-discriminant-analysis-lda-model-merged-dataset" class="section level4">
-<h4>1. Linear Discriminant Analysis (LDA) Model (merged dataset)</h4>
-<pre class="r"><code># lda engine
+<div id="linear-discriminant-analysis-lda-model-method-1.-merged-dataset" class="section level4">
+<h4>Linear Discriminant Analysis (LDA) Model (Method 1. merged
+dataset)</h4>
+<pre class="r"><code># test out a lda model on our merged dataset
 lda_mod &lt;- discrim_linear() %&gt;% 
   set_mode(&quot;classification&quot;) %&gt;% 
-  set_engine(&quot;MASS&quot;)</code></pre>
-<pre class="r"><code># test out a lda model on our merged dataset
+  set_engine(&quot;MASS&quot;)
 
-# create workflow and add recipe
+# create workflow
 lda_wkflow &lt;- workflow() %&gt;% 
   add_model(lda_mod) %&gt;% 
-  add_recipe(grades_recipe1)
+  add_recipe(grades_recipe1_fctr)
 
+# fit
 lda_fit &lt;- fit(lda_wkflow, grades_train_fctr)
 
-# LDA model performance
+# predict
 predict(lda_fit, new_data = grades_train_fctr, type = &quot;prob&quot;)</code></pre>
 <pre><code>## # A tibble: 730 × 2
 ##    .pred_Fail .pred_Pass
@@ -1052,13 +1137,15 @@ predict(lda_fit, new_data = grades_train_fctr, type = &quot;prob&quot;)</code></
 ##  9      0.828   0.172   
 ## 10      0.848   0.152   
 ## # … with 720 more rows</code></pre>
-<pre class="r"><code>augment(lda_fit, new_data = grades_train_fctr) %&gt;%
+<pre class="r"><code># confusion matrix
+augment(lda_fit, new_data = grades_train_fctr) %&gt;%
   conf_mat(truth = G3, estimate = .pred_class)</code></pre>
 <pre><code>##           Truth
 ## Prediction Fail Pass
 ##       Fail  229   24
 ##       Pass   39  438</code></pre>
-<pre class="r"><code>lda_acc &lt;- augment(lda_fit, new_data = grades_train_fctr) %&gt;%
+<pre class="r"><code># accuracy
+lda_acc &lt;- augment(lda_fit, new_data = grades_train_fctr) %&gt;%
   accuracy(truth = G3, estimate = .pred_class)
 lda_acc</code></pre>
 <pre><code>## # A tibble: 1 × 3
@@ -1066,19 +1153,23 @@ lda_acc</code></pre>
 ##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
 ## 1 accuracy binary         0.914</code></pre>
 </div>
-<div id="linear-discriminant-analysis-lda-model-portuguese-data-for-training-maths-data-for-testing" class="section level4">
-<h4>2. Linear Discriminant Analysis (LDA) Model (Portuguese data for
-training, Maths data for testing)</h4>
+<div id="linear-discriminant-analysis-lda-model-method-2.-portuguese-for-training-maths-for-testing" class="section level4">
+<h4>Linear Discriminant Analysis (LDA) Model (Method 2. Portuguese for
+training, Maths for testing)</h4>
 <pre class="r"><code># test out a lda model on our second dataset (using Portuguese for training, Maths for testing)
+lda_mod &lt;- discrim_linear() %&gt;% 
+  set_mode(&quot;classification&quot;) %&gt;% 
+  set_engine(&quot;MASS&quot;)
 
 # create workflow and add recipe
 lda_wkflow2 &lt;- workflow() %&gt;% 
   add_model(lda_mod) %&gt;% 
-  add_recipe(grades_recipe2)
+  add_recipe(grades_recipe2_fctr)
 
+# fit
 lda_fit2 &lt;- fit(lda_wkflow2, grades_train2_fctr)
 
-# LDA model performance
+# predict
 predict(lda_fit2, new_data = grades_train2_fctr, type = &quot;prob&quot;)</code></pre>
 <pre><code>## # A tibble: 649 × 2
 ##    .pred_Fail .pred_Pass
@@ -1094,13 +1185,15 @@ predict(lda_fit2, new_data = grades_train2_fctr, type = &quot;prob&quot;)</code>
 ##  9   0.000533      0.999
 ## 10   0.0220        0.978
 ## # … with 639 more rows</code></pre>
-<pre class="r"><code>augment(lda_fit2, new_data = grades_train2_fctr) %&gt;%
+<pre class="r"><code># confusion matrix
+augment(lda_fit2, new_data = grades_train2_fctr) %&gt;%
   conf_mat(truth = G3, estimate = .pred_class)</code></pre>
 <pre><code>##           Truth
 ## Prediction Fail Pass
 ##       Fail  149   22
 ##       Pass   48  430</code></pre>
-<pre class="r"><code>lda_acc2 &lt;- augment(lda_fit2, new_data = grades_train2_fctr) %&gt;%
+<pre class="r"><code># accuracy
+lda_acc2 &lt;- augment(lda_fit2, new_data = grades_train2_fctr) %&gt;%
   accuracy(truth = G3, estimate = .pred_class)
 lda_acc2</code></pre>
 <pre><code>## # A tibble: 1 × 3
@@ -1108,21 +1201,23 @@ lda_acc2</code></pre>
 ##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
 ## 1 accuracy binary         0.892</code></pre>
 </div>
-<div id="quadratic-discriminant-analysis-qda-model-merged-dataset" class="section level4">
-<h4>1. Quadratic Discriminant Analysis (QDA) Model (merged dataset)</h4>
-<pre class="r"><code>qda_mod &lt;- discrim_quad() %&gt;% 
-  set_mode(&quot;classification&quot;) %&gt;% 
-  set_engine(&quot;MASS&quot;)</code></pre>
+<div id="quadratic-discriminant-analysis-qda-model-method-1.-merged-dataset" class="section level4">
+<h4>Quadratic Discriminant Analysis (QDA) Model (Method 1. merged
+dataset)</h4>
 <pre class="r"><code># test out a qda model on our merged dataset
+qda_mod &lt;- discrim_quad() %&gt;% 
+  set_mode(&quot;classification&quot;) %&gt;% 
+  set_engine(&quot;MASS&quot;)
 
-# create workflow and add recipe
+# create workflow
 qda_wkflow &lt;- workflow() %&gt;% 
   add_model(qda_mod) %&gt;% 
-  add_recipe(grades_recipe1) # recipe from before
+  add_recipe(grades_recipe1_fctr) # recipe from before
 
+# fit
 qda_fit &lt;- fit(qda_wkflow, grades_train_fctr)
 
-# QDA model performance
+# predict
 predict(qda_fit, new_data = grades_train_fctr, type = &quot;prob&quot;)</code></pre>
 <pre><code>## # A tibble: 730 × 2
 ##    .pred_Fail .pred_Pass
@@ -1138,13 +1233,15 @@ predict(qda_fit, new_data = grades_train_fctr, type = &quot;prob&quot;)</code></
 ##  9     0.735    2.65e- 1
 ## 10     0.983    1.69e- 2
 ## # … with 720 more rows</code></pre>
-<pre class="r"><code>augment(qda_fit, new_data = grades_train_fctr) %&gt;%
+<pre class="r"><code># confusion matrix
+augment(qda_fit, new_data = grades_train_fctr) %&gt;%
   conf_mat(truth = G3, estimate = .pred_class)</code></pre>
 <pre><code>##           Truth
 ## Prediction Fail Pass
 ##       Fail  228   30
 ##       Pass   40  432</code></pre>
-<pre class="r"><code>qda_acc &lt;- augment(qda_fit, new_data = grades_train_fctr) %&gt;%
+<pre class="r"><code># accuracy
+qda_acc &lt;- augment(qda_fit, new_data = grades_train_fctr) %&gt;%
   accuracy(truth = G3, estimate = .pred_class)
 qda_acc</code></pre>
 <pre><code>## # A tibble: 1 × 3
@@ -1152,17 +1249,23 @@ qda_acc</code></pre>
 ##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
 ## 1 accuracy binary         0.904</code></pre>
 </div>
-<div id="quadratic-discriminant-analysis-qda-model-portuguese-data-for-training-maths-data-for-testing" class="section level4">
-<h4>2. Quadratic Discriminant Analysis (QDA) Model (Portuguese data for
-training, Maths data for testing)</h4>
+<div id="quadratic-discriminant-analysis-qda-model-method-2.-portuguese-for-training-maths-for-testing" class="section level4">
+<h4>Quadratic Discriminant Analysis (QDA) Model (Method 2. Portuguese
+for training, Maths for testing)</h4>
 <pre class="r"><code># test out a ada model on our second dataset (using Portuguese for training, Maths for testing)
+qda_mod &lt;- discrim_quad() %&gt;% 
+  set_mode(&quot;classification&quot;) %&gt;% 
+  set_engine(&quot;MASS&quot;)
+
+# create workflow
 qda_wkflow2 &lt;- workflow() %&gt;% 
   add_model(qda_mod) %&gt;% 
-  add_recipe(grades_recipe2) # recipe from before
+  add_recipe(grades_recipe2_fctr) # recipe from before
 
+# fit
 qda_fit2 &lt;- fit(qda_wkflow2, grades_train2_fctr)
 
-# QDA model performance
+# predict
 predict(qda_fit2, new_data = grades_train2_fctr, type = &quot;prob&quot;)</code></pre>
 <pre><code>## # A tibble: 649 × 2
 ##    .pred_Fail .pred_Pass
@@ -1178,300 +1281,158 @@ predict(qda_fit2, new_data = grades_train2_fctr, type = &quot;prob&quot;)</code>
 ##  9   7.81e-10      1.00 
 ## 10   2.13e- 5      1.00 
 ## # … with 639 more rows</code></pre>
-<pre class="r"><code>augment(qda_fit2, new_data = grades_train2_fctr) %&gt;%
+<pre class="r"><code># confusion matrix
+augment(qda_fit2, new_data = grades_train2_fctr) %&gt;%
   conf_mat(truth = G3, estimate = .pred_class)</code></pre>
 <pre><code>##           Truth
 ## Prediction Fail Pass
 ##       Fail  173   29
 ##       Pass   24  423</code></pre>
-<pre class="r"><code>qda_acc2 &lt;- augment(qda_fit2, new_data = grades_train2_fctr) %&gt;%
+<pre class="r"><code># accuracy
+qda_acc2 &lt;- augment(qda_fit2, new_data = grades_train2_fctr) %&gt;%
   accuracy(truth = G3, estimate = .pred_class)
 qda_acc2</code></pre>
 <pre><code>## # A tibble: 1 × 3
 ##   .metric  .estimator .estimate
 ##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
 ## 1 accuracy binary         0.918</code></pre>
+<p>From the three kinds of models, it seems like logistic regression
+performed the best, giving us the highest accuracy. For logistic
+regression and QDA, Method 2 (Portuguese=training, Maths=testing) of
+data splitting gave higher accuracy. But for QDA, Method 1 (merged
+dataset) gave a higher accuracy.</p>
 </div>
 </div>
 <div id="k-fold-cross-validation-1" class="section level3">
 <h3>k-fold cross validation</h3>
-<p>As we try k-fold cross validation on the LDA model (performed best
-out of classification models), we see that the imbalanced “grade
-categories” from earlier becomes a problem. To compare the accuracy of
-the G3 prediction with the true value of G3, we need the same levels in
-both training and testing datasets. Unfortunately because the factor
-levels in training and testing datasets are unequal, we run into an
-error saying “truth (G3) and estimate (.pred_class)” must have the same
-levels in the same order.</p>
-<pre class="r"><code>grades_folds_fctr &lt;- vfold_cv(grades_train_fctr, v = 10)
-grades_folds_fctr</code></pre>
-<pre><code>## #  10-fold cross-validation 
-## # A tibble: 10 × 2
-##    splits           id    
-##    &lt;list&gt;           &lt;chr&gt; 
-##  1 &lt;split [657/73]&gt; Fold01
-##  2 &lt;split [657/73]&gt; Fold02
-##  3 &lt;split [657/73]&gt; Fold03
-##  4 &lt;split [657/73]&gt; Fold04
-##  5 &lt;split [657/73]&gt; Fold05
-##  6 &lt;split [657/73]&gt; Fold06
-##  7 &lt;split [657/73]&gt; Fold07
-##  8 &lt;split [657/73]&gt; Fold08
-##  9 &lt;split [657/73]&gt; Fold09
-## 10 &lt;split [657/73]&gt; Fold10</code></pre>
-<pre class="r"><code># lda using MASS engine
-lda_mod &lt;- discrim_linear() %&gt;% 
-  set_mode(&quot;classification&quot;) %&gt;% 
-  set_engine(&quot;MASS&quot;)
-# create workflow
-lda_wkflow &lt;- workflow() %&gt;% 
-  add_model(lda_mod) %&gt;% 
-  add_recipe(grades_recipe1)
+<p>We can try k-fold cross validation on the model that performed best
+out of classification models (logistic regression)</p>
+<div id="method-1.-merged-dataset" class="section level4">
+<h4>Method 1. merged dataset</h4>
+<pre class="r"><code># 10-fold cross validation
+grades_folds_fctr &lt;- vfold_cv(grades_train_fctr, v = 10)
 
-fit_lda_kfold &lt;- fit_resamples(lda_wkflow,
+# logistic regression model
+log_reg &lt;- logistic_reg() %&gt;% 
+  set_engine(&quot;glm&quot;)
+
+# create workflow
+log_wkflow &lt;- workflow() %&gt;% 
+  add_model(log_reg) %&gt;% 
+  add_recipe(grades_recipe1_fctr)
+
+# fit to the folds
+fit_log_kfold &lt;- fit_resamples(log_wkflow,
                         grades_folds_fctr,
                         control = control_resamples(save_pred = TRUE)
                         )
-collect_metrics(fit_lda_kfold)</code></pre>
+collect_metrics(fit_log_kfold)</code></pre>
 <pre><code>## # A tibble: 2 × 6
 ##   .metric  .estimator  mean     n std_err .config             
 ##   &lt;chr&gt;    &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;               
-## 1 accuracy binary     0.885    10 0.0139  Preprocessor1_Model1
-## 2 roc_auc  binary     0.954    10 0.00766 Preprocessor1_Model1</code></pre>
-<pre class="r"><code>final_fit &lt;- fit(lda_wkflow, grades_train_fctr)
-final_fit</code></pre>
-<pre><code>## ══ Workflow [trained] ══════════════════════════════════════════════════════════
-## Preprocessor: Recipe
-## Model: discrim_linear()
-## 
-## ── Preprocessor ────────────────────────────────────────────────────────────────
-## 1 Recipe Step
-## 
-## • step_dummy()
-## 
-## ── Model ───────────────────────────────────────────────────────────────────────
-## Call:
-## lda(..y ~ ., data = data)
-## 
-## Prior probabilities of groups:
-##      Fail      Pass 
-## 0.3671233 0.6328767 
-## 
-## Group means:
-##           age     Medu     Fedu traveltime studytime   failures   famrel
-## Fail 16.97761 2.380597 2.182836   1.611940  1.843284 0.58955224 3.962687
-## Pass 16.64069 2.781385 2.554113   1.471861  2.058442 0.06926407 3.948052
-##      freetime    goout     Dalc     Walc   health absences       G1        G2
-## Fail 3.291045 3.235075 1.600746 2.481343 3.593284 5.000000  8.41791  8.231343
-## Pass 3.203463 3.106061 1.400433 2.155844 3.534632 3.958874 12.85714 13.060606
-##      school_MS     sex_M address_U famsize_LE3 Pstatus_T Mjob_health Mjob_other
-## Fail 0.3470149 0.4738806 0.6641791   0.2611940 0.8992537  0.05597015  0.4067164
-## Pass 0.1926407 0.4090909 0.7662338   0.2922078 0.8831169  0.09090909  0.3571429
-##      Mjob_services Mjob_teacher Fjob_health Fjob_other Fjob_services
-## Fail     0.1828358    0.1082090  0.03358209  0.5522388     0.3097015
-## Pass     0.2445887    0.1580087  0.04329004  0.5757576     0.2424242
-##      Fjob_teacher reason_home reason_other reason_reputation guardian_mother
-## Fail   0.02985075   0.2126866    0.1119403         0.1940299       0.7313433
-## Pass   0.08008658   0.2489177    0.1038961         0.2748918       0.7056277
-##      guardian_other schoolsup_yes famsup_yes  paid_yes activities_yes
-## Fail     0.08582090    0.15298507  0.6119403 0.2649254      0.4813433
-## Pass     0.05844156    0.09090909  0.6060606 0.1861472      0.5021645
-##      nursery_yes higher_yes internet_yes romantic_yes course_Portuguese
-## Fail   0.7798507  0.8171642    0.7425373    0.3768657         0.5000000
-## Pass   0.8095238  0.9675325    0.8181818    0.3484848         0.6948052
-## 
-## Coefficients of linear discriminants:
-##                            LD1
-## age               -0.031892982
-## Medu              -0.076552717
-## Fedu               0.065648017
-## traveltime         0.021051289
-## studytime         -0.033550913
-## failures          -0.301517182
-## famrel            -0.075294891
-## freetime          -0.068758405
-## goout              0.076269258
-## Dalc               0.070082290
-## Walc              -0.076868718
-## health             0.040764910
-## absences          -0.006811361
-## G1                 0.188086111
-## G2                 0.257347948
-## school_MS         -0.442758172
-## sex_M             -0.098496265
-## address_U          0.069509974
-## 
-## ...
-## and 24 more lines.</code></pre>
-<pre class="r"><code># LDA model performance
-grades_predicted &lt;- predict(final_fit, new_data = grades_test2_fctr)
-grades_predicted &lt;- bind_cols(grades_predicted, grades_test2_fctr$G3)
+## 1 accuracy binary     0.892    10 0.0113  Preprocessor1_Model1
+## 2 roc_auc  binary     0.959    10 0.00533 Preprocessor1_Model1</code></pre>
+<pre class="r"><code># fit model to entire training dataset
+final_fit &lt;- fit(log_wkflow, grades_train_fctr)
+
+# fit model to testing dataset, bind predictions to actual observations
+grades_predicted &lt;- predict(final_fit, new_data = grades_test_fctr)
+grades_predicted &lt;- bind_cols(grades_predicted, grades_test_fctr$G3)
 grades_predicted</code></pre>
-<pre><code>## # A tibble: 395 × 2
+<pre><code>## # A tibble: 314 × 2
 ##    .pred_class ...2 
 ##    &lt;fct&gt;       &lt;fct&gt;
-##  1 Fail        Fail 
-##  2 Fail        Fail 
-##  3 Fail        Fail 
-##  4 Pass        Pass 
-##  5 Fail        Fail 
-##  6 Pass        Pass 
+##  1 Pass        Pass 
+##  2 Pass        Pass 
+##  3 Pass        Pass 
+##  4 Fail        Fail 
+##  5 Pass        Pass 
+##  6 Fail        Fail 
 ##  7 Pass        Pass 
-##  8 Fail        Fail 
+##  8 Fail        Pass 
 ##  9 Pass        Pass 
-## 10 Pass        Pass 
-## # … with 385 more rows</code></pre>
+## 10 Fail        Pass 
+## # … with 304 more rows</code></pre>
 <pre class="r"><code># confusion matrix
-augment(final_fit, new_data = grades_test2_fctr) %&gt;%
+augment(final_fit, new_data = grades_test_fctr) %&gt;%
   conf_mat(truth = G3, estimate = .pred_class)</code></pre>
 <pre><code>##           Truth
 ## Prediction Fail Pass
-##       Fail  174   17
-##       Pass   12  192</code></pre>
-<pre class="r"><code># accuracy
-lda_acc_kfold &lt;- augment(final_fit, new_data = grades_test2_fctr) %&gt;%
-  accuracy(truth = grades_test2_fctr$G3, estimate = .pred_class)
-lda_acc_kfold</code></pre>
+##       Fail  105   14
+##       Pass   10  185</code></pre>
+<pre class="r"><code># accuracy on testing dataset
+log_acc_kfold &lt;- augment(final_fit, new_data = grades_test_fctr) %&gt;%
+  accuracy(truth = grades_test_fctr$G3, estimate = .pred_class)
+log_acc_kfold</code></pre>
 <pre><code>## # A tibble: 1 × 3
 ##   .metric  .estimator .estimate
 ##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
-## 1 accuracy binary         0.927</code></pre>
-<pre class="r"><code>grades_folds2_fctr &lt;- vfold_cv(grades_train2_fctr, v = 10)
-grades_folds2_fctr</code></pre>
-<pre><code>## #  10-fold cross-validation 
-## # A tibble: 10 × 2
-##    splits           id    
-##    &lt;list&gt;           &lt;chr&gt; 
-##  1 &lt;split [584/65]&gt; Fold01
-##  2 &lt;split [584/65]&gt; Fold02
-##  3 &lt;split [584/65]&gt; Fold03
-##  4 &lt;split [584/65]&gt; Fold04
-##  5 &lt;split [584/65]&gt; Fold05
-##  6 &lt;split [584/65]&gt; Fold06
-##  7 &lt;split [584/65]&gt; Fold07
-##  8 &lt;split [584/65]&gt; Fold08
-##  9 &lt;split [584/65]&gt; Fold09
-## 10 &lt;split [585/64]&gt; Fold10</code></pre>
-<pre class="r"><code># lda using MASS engine
-lda_mod &lt;- discrim_linear() %&gt;% 
-  set_mode(&quot;classification&quot;) %&gt;% 
-  set_engine(&quot;MASS&quot;)
+## 1 accuracy binary         0.924</code></pre>
+</div>
+<div id="method-2.-portuguese-for-training-maths-for-testing" class="section level4">
+<h4>Method 2. Portuguese for training, Maths for testing</h4>
+<pre class="r"><code># 10-fold cross validation
+grades_folds2_fctr &lt;- vfold_cv(grades_train2_fctr, v = 10)
 
-# test out a lda model on our second dataset (using Portuguese for training, Maths for testing)
-lda_wkflow2 &lt;- workflow() %&gt;% 
-  add_model(lda_mod) %&gt;% 
-  add_recipe(grades_recipe2) # recipe from before
+# logistic regression model
+log_reg &lt;- logistic_reg() %&gt;% 
+  set_engine(&quot;glm&quot;)
 
+# create workflow
+log_wkflow2 &lt;- workflow() %&gt;% 
+  add_model(log_reg) %&gt;% 
+  add_recipe(grades_recipe2_fctr)
 
-fit_lda2_kfold &lt;- fit_resamples(lda_wkflow2,
+# fit model to folds
+fit_log2_kfold &lt;- fit_resamples(log_wkflow2,
                         grades_folds2_fctr,
                         control = control_resamples(save_pred = TRUE)
                         )
 
-collect_metrics(fit_lda2_kfold)</code></pre>
+collect_metrics(fit_log2_kfold)</code></pre>
 <pre><code>## # A tibble: 2 × 6
 ##   .metric  .estimator  mean     n std_err .config             
 ##   &lt;chr&gt;    &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;               
-## 1 accuracy binary     0.867    10 0.0154  Preprocessor1_Model1
-## 2 roc_auc  binary     0.941    10 0.00496 Preprocessor1_Model1</code></pre>
-<pre class="r"><code>final_fit2 &lt;- fit(lda_wkflow2, grades_train_fctr)
-final_fit2</code></pre>
-<pre><code>## ══ Workflow [trained] ══════════════════════════════════════════════════════════
-## Preprocessor: Recipe
-## Model: discrim_linear()
-## 
-## ── Preprocessor ────────────────────────────────────────────────────────────────
-## 1 Recipe Step
-## 
-## • step_dummy()
-## 
-## ── Model ───────────────────────────────────────────────────────────────────────
-## Call:
-## lda(..y ~ ., data = data)
-## 
-## Prior probabilities of groups:
-##      Fail      Pass 
-## 0.3671233 0.6328767 
-## 
-## Group means:
-##           age     Medu     Fedu traveltime studytime   failures   famrel
-## Fail 16.97761 2.380597 2.182836   1.611940  1.843284 0.58955224 3.962687
-## Pass 16.64069 2.781385 2.554113   1.471861  2.058442 0.06926407 3.948052
-##      freetime    goout     Dalc     Walc   health absences       G1        G2
-## Fail 3.291045 3.235075 1.600746 2.481343 3.593284 5.000000  8.41791  8.231343
-## Pass 3.203463 3.106061 1.400433 2.155844 3.534632 3.958874 12.85714 13.060606
-##      school_MS     sex_M address_U famsize_LE3 Pstatus_T Mjob_health Mjob_other
-## Fail 0.3470149 0.4738806 0.6641791   0.2611940 0.8992537  0.05597015  0.4067164
-## Pass 0.1926407 0.4090909 0.7662338   0.2922078 0.8831169  0.09090909  0.3571429
-##      Mjob_services Mjob_teacher Fjob_health Fjob_other Fjob_services
-## Fail     0.1828358    0.1082090  0.03358209  0.5522388     0.3097015
-## Pass     0.2445887    0.1580087  0.04329004  0.5757576     0.2424242
-##      Fjob_teacher reason_home reason_other reason_reputation guardian_mother
-## Fail   0.02985075   0.2126866    0.1119403         0.1940299       0.7313433
-## Pass   0.08008658   0.2489177    0.1038961         0.2748918       0.7056277
-##      guardian_other schoolsup_yes famsup_yes  paid_yes activities_yes
-## Fail     0.08582090    0.15298507  0.6119403 0.2649254      0.4813433
-## Pass     0.05844156    0.09090909  0.6060606 0.1861472      0.5021645
-##      nursery_yes higher_yes internet_yes romantic_yes
-## Fail   0.7798507  0.8171642    0.7425373    0.3768657
-## Pass   0.8095238  0.9675325    0.8181818    0.3484848
-## 
-## Coefficients of linear discriminants:
-##                            LD1
-## age               -0.031907108
-## Medu              -0.074296405
-## Fedu               0.068660197
-## traveltime         0.020542291
-## studytime         -0.049383158
-## failures          -0.332184486
-## famrel            -0.078423623
-## freetime          -0.090359028
-## goout              0.088453579
-## Dalc               0.092564618
-## Walc              -0.076454932
-## health             0.046374335
-## absences          -0.010112529
-## G1                 0.186772288
-## G2                 0.269345199
-## school_MS         -0.344830076
-## sex_M             -0.123850626
-## address_U          0.055408706
-## 
-## ...
-## and 23 more lines.</code></pre>
-<pre class="r"><code># LDA model performance
+## 1 accuracy binary     0.894    10 0.00842 Preprocessor1_Model1
+## 2 roc_auc  binary     0.951    10 0.00806 Preprocessor1_Model1</code></pre>
+<pre class="r"><code># fit model to entire training dataset
+final_fit2 &lt;- fit(log_wkflow2, grades_train2_fctr)
+
+# fit model to testing dataset, bind predictions to actual observations
 grades_predicted2 &lt;- predict(final_fit2, new_data = grades_test2_fctr, type = &quot;prob&quot;)
 grades_predicted2 &lt;- bind_cols(grades_predicted2, grades_test2_fctr$G3)
 grades_predicted2</code></pre>
 <pre><code>## # A tibble: 395 × 3
-##    .pred_Fail .pred_Pass ...3 
-##         &lt;dbl&gt;      &lt;dbl&gt; &lt;fct&gt;
-##  1   0.995       0.00464 Fail 
-##  2   0.991       0.00870 Fail 
-##  3   0.997       0.00347 Fail 
-##  4   0.0119      0.988   Pass 
-##  5   0.793       0.207   Fail 
-##  6   0.0104      0.990   Pass 
-##  7   0.0520      0.948   Pass 
-##  8   0.991       0.00895 Fail 
-##  9   0.000315    1.00    Pass 
-## 10   0.0112      0.989   Pass 
+##      .pred_Fail .pred_Pass ...3 
+##           &lt;dbl&gt;      &lt;dbl&gt; &lt;fct&gt;
+##  1 0.998         0.00156   Fail 
+##  2 1.00          0.0000452 Fail 
+##  3 0.999         0.00102   Fail 
+##  4 0.000143      1.00      Pass 
+##  5 0.424         0.576     Fail 
+##  6 0.0000443     1.00      Pass 
+##  7 0.00463       0.995     Pass 
+##  8 0.999         0.000683  Fail 
+##  9 0.0000000138  1.00      Pass 
+## 10 0.0000224     1.00      Pass 
 ## # … with 385 more rows</code></pre>
 <pre class="r"><code># confusion matrix
 augment(final_fit2, new_data = grades_test2_fctr) %&gt;%
   conf_mat(truth = G3, estimate = .pred_class)</code></pre>
 <pre><code>##           Truth
 ## Prediction Fail Pass
-##       Fail  165   12
-##       Pass   21  197</code></pre>
+##       Fail  154   10
+##       Pass   32  199</code></pre>
 <pre class="r"><code># accuracy
-lda_acc2_kfold &lt;- augment(final_fit2, new_data = grades_test2_fctr) %&gt;%
+log_acc2_kfold &lt;- augment(final_fit2, new_data = grades_test2_fctr) %&gt;%
   accuracy(truth = grades_test2_fctr$G3, estimate = .pred_class)
-lda_acc2_kfold</code></pre>
+log_acc2_kfold</code></pre>
 <pre><code>## # A tibble: 1 × 3
 ##   .metric  .estimator .estimate
 ##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
-## 1 accuracy binary         0.916</code></pre>
+## 1 accuracy binary         0.894</code></pre>
+</div>
+</div>
 </div>
 </div>
 

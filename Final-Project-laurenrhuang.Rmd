@@ -11,12 +11,13 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-A brief introduction to the selected data set: The data contains information regarding students' academic achievement in secondary education of two Portuguese schools. 
-The dataset contains predictor variables, including but not limited to: school, sex, age, address, family size, parent status, mother's education, father's education, mother's job, father's job, etc. There are also variables called G1, G2 and G3. G1 represents a student's grade during first period, G2 represents a student's grade during second period. G3 represents a student's final grade in the class. Having both G1 and G2 are extremely helpful in predicting G3, which is a student's final grade in a class.
+# Predicting students' grades in two Portuguese schools
+
+A brief introduction to the selected data set: The data contains information regarding students' academic achievement in secondary education of two Portuguese schools. There are two datasets. One for Maths class, one for Portuguese class. Both datasets contain the same predictor variables, including but not limited to: school, sex, age, address, family size, parent status, mother's education, father's education, mother's job, father's job, etc. There are also variables called G1, G2 and G3. G1 represents a student's grade during first period, G2 represents a student's grade during second period. G3 represents a student's final grade in the class. Having both G1 and G2 are extremely helpful in predicting G3, which is a student's final grade in a class.
 
 ## Reading in the data, cleaning the data
 
-The first step is *TYPE EXPLANATION HERE*
+The first step is to install packages for any functions or models we'll need to fit. For the framework of our models, we'll be using tidymodels.
 
 ```{r, message = F, warning = F}
 library(tidyverse)
@@ -27,13 +28,19 @@ library(poissonreg)
 library(corrr)
 library(klaR) # for naive bayes
 tidymodels_prefer()
+```
 
+After installing necessary packages, we read in our two datasets for the classes "Maths" and "Portuguese." Before we do any analysis, we should get to know our data better first. Let's take a look at the variables, the number of observations in each dataset, and make histograms for each of the datasets to see how G3 student grades are distributed.
+
+```{r}
 # read in the Maths dataset
 Maths <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/Maths.csv",
                   show_col_types = FALSE)
 Maths %>% head()
+
 # number of observations in Maths
 dim(Maths)
+
 # distribution of G3 grades in Maths
 hist(Maths$G3,
      breaks=19,
@@ -44,14 +51,20 @@ hist(Maths$G3,
 Portuguese <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/Portuguese.csv",
                        show_col_types = FALSE)
 Portuguese %>% head()
+
 # number of observations in Portuguese
 dim(Portuguese)
+
 # distribution of G3 grades in Portuguese
 hist(Portuguese$G3,
      breaks=19,
      xlab = "student final grades (G3) in Portuguese",
      ylab = "count")
 ```
+
+As we mentioned earlier, the goal of using this data will be using our predictor variables (ex. school, sex, age, address, family size, parental status, mother's education, father's education, etc.) to predict a student's G3 (final grade) grade/whether a student will pass the class. As we look through the variables, we see that G1 and G2 grades are included. This is great because they will help us in predicting G3 grades.
+
+Let's add a variable called "course" so we know which observations are from which dataset. This is important because later we will be merging and/or splitting the dataset, so we want to keep track.
 
 ```{r}
 # add course = "Maths" as a predictor to label the dataset
@@ -70,14 +83,18 @@ Portuguese_new %>% head()
 
 ### How should we use the 2 datasets?
 
-*EXPLANATION GOES HERE*
+Since we have 2 datasets and not just 1, there are more options with how we can use them. Let's try two different ways: 
+  1. Method 1 will be to take both the Maths and Portuguese datasets and merge them into one big dataset. 
+  2. Method 2 will be to use one dataset to train, and the other to test our models. I will be using Portuguese to train and Maths to test because Portuguese has more observations (usually we want the proportion of training data to be bigger than testing!)
+We will use both methods of data splitting to see which gives us more accurate predictions from the models.
 
-#### 1. Merging the data
+#### Method 1. Merging the data
+
+For method 1, let's merge both Maths and Portuguese into one large dataset.  Mainly we will be working with the data that is labeled by course. After merging, split the merged dataset into training dataset and testing dataset, stratifying on G3, our outcome variable. Stratifying on G3 helps us keep the proportions of the original dataset when we split into training and testing! (You'll notice I'm also merging the data that doesn't have the course variable because I'll need to use it later on.)
 
 ```{r}
 # merge dataset (without labels) into one large dataset 
-# for use later on in the project
-all_classes <- rbind(Maths, Portuguese)
+all_classes <- rbind(Maths, Portuguese) # for train/testing use later on in the project
 all_classes %>% head()
 
 # merge course labeled Maths and Portuguese datasets into one large dataset
@@ -86,17 +103,15 @@ all_classes2 %>% head()
 
 # split labeled, merged dataset into training and testing
 set.seed(3435)
-
 grades_split <- initial_split(all_classes2, prop = 0.7,
                               strata = G3)
-
 grades_train <- training(grades_split)
 grades_test <- testing(grades_split)
 ```
 
-#### 2. Using one dataset for training, using one dataset for testing
+#### Method 2. Using one dataset for training, using one dataset for testing
 
-*ASK FOR HELP HERE*
+Next, for method two, let's take that large merged dataset we made in the previous step. To use Portuguese for training and Maths for testing, I'm going to group the data by the course variable when we split. With a little bit of math, we can calculate exactly where to split the data so the training is Portuguese data and testing is Maths data. We can check that we split the data correctly by verifying the number of observations in grades_train2 and grades_test2 matches the number of observations in Portuguese and Maths. Which it does, yay! Next, I'm going to remove the course labels from the training and testing datasets, because this may cause problems later on when we try to compare predictions during training/testing.
 
 ```{r}
 # split labeled dataset by "course" predictor
@@ -125,24 +140,40 @@ grades_test2_nocourse <- grades_test2 %>%
 
 ## Should we choose Regression or Classification?
 
-*EXPLANATION GOES HERE*
+The next tricky question we have is to use regression or classification methods. Technically G3 grades are discrete, for example a student can get a grade of 0, 1, 4, 5, but nothing like 1.5 or 4.33. However, from our histogram earlier, we saw that some grades are more commonly earned than others. Specifically, many students earn grades of 0, 9 or 10, but there are very few/no students who earn a grade of 4. Because the grades are so disproportionately spread out, this might cause a problem if we use a classification model. There wouldn't be "enough" grades in each level/category for the model to be trained well. Because of this problem, let's try fitting models in both regression and classification.
+
+Please note: for each of the models below, I will be fitting one model for each method of data splitting. (ex. linear regression model for merged dataset, linear regression model for Portuguese=training, Maths=testing) We will compare the two and see which method of data splitting gives us better predictions.
 
 ### Regression
 
-#### 1. Linear Regression Model (merged dataset)
+We will make 2 recipes, the first one we use when working with Method 1. merged dataset (has course variable) and the second we use when working with Method 2. Portuguese for training, Maths for testing (without course variable). 
+
+The reason for this is because for Method 2, we split the data into training/testing by course. However, when we fit models and predict, having course=Portuguese for training and course=Math throws an error because the model won't know how to carry over its training knowledge to testing when the two courses are not the same. Therefore we need this 2nd recipe without the course variable, and we need grades_train2_nocourse and grades_test2_nocourse to fit the model.
 
 ```{r}
-# test out a linear regression model on our merged dataset
 grades_recipe1 <- recipe(G3 ~ ., data=all_classes2) %>%
   step_dummy(all_nominal_predictors())
 
+grades_recipe2 <- recipe(G3 ~ ., data=all_classes) %>%
+  step_dummy(all_nominal_predictors())
+```
+
+
+We'll begin with a linear regression model.
+
+#### Linear Regression Model (Method 1. merged dataset)
+
+```{r}
+# test out a linear regression model on our merged dataset
 lm_model <- linear_reg() %>% 
   set_engine("lm")
 
+# create workflow
 lm_wflow <- workflow() %>% 
   add_model(lm_model) %>% 
   add_recipe(grades_recipe1)
 
+# fit
 lm_fit <- fit(lm_wflow, grades_train)
 
 lm_fit %>% 
@@ -151,11 +182,13 @@ lm_fit %>%
   # Now tidy the linear model object:
   tidy()
 
+# put predictions and actual observations together
 grades_train_res <- predict(lm_fit, new_data = grades_train %>% select(-G3))
 grades_train_res <- bind_cols(grades_train_res, grades_train %>% select(G3))
 grades_train_res %>% 
   head()
 
+# plot to visualize
 grades_train_res %>% 
   ggplot(aes(x = .pred, y = G3)) +
   geom_point(alpha = 0.2) +
@@ -163,25 +196,25 @@ grades_train_res %>%
   theme_bw() +
   coord_obs_pred()
 
+# our metrics
 grades_metrics1 <- metric_set(rmse, rsq, mae)
 grades_metrics1(grades_train_res, truth = G3, 
                 estimate = .pred)
 ```
 
-#### 2. Linear Regression Model (Portuguese data for training, Maths data for testing)
+#### Linear Regression Model (Method 2. Portuguese for training, Maths for testing)
 
 ```{r}
 # test out a linear regression model on our second dataset (using Portuguese for training, Maths for testing)
-grades_recipe2 <- recipe(G3 ~ ., data=all_classes) %>%
-  step_dummy(all_nominal_predictors())
-
 lm_model <- linear_reg() %>% 
   set_engine("lm")
 
+# create workflow
 lm_wflow2 <- workflow() %>% 
   add_model(lm_model) %>% 
   add_recipe(grades_recipe2)
 
+# fit
 lm_fit <- fit(lm_wflow2, grades_train2_nocourse)
 
 lm_fit %>% 
@@ -190,11 +223,13 @@ lm_fit %>%
   # Now tidy the linear model object:
   tidy()
 
+# put predictions and actual observations together
 grades_train_res2 <- predict(lm_fit, new_data = grades_train2 %>% select(-G3))
 grades_train_res2 <- bind_cols(grades_train_res2, grades_train2_nocourse %>% select(G3))
 grades_train_res2 %>% 
   head()
 
+# plot to visualize
 grades_train_res2 %>% 
   ggplot(aes(x = .pred, y = G3)) +
   geom_point(alpha = 0.2) +
@@ -202,98 +237,99 @@ grades_train_res2 %>%
   theme_bw() +
   coord_obs_pred()
 
+# our metrics
 grades_metrics2 <- metric_set(rmse, rsq, mae)
 grades_metrics2(grades_train_res2, truth = G3, 
                 estimate = .pred)
 ```
 
+From our two linear regression models above, we see that both have values of rmse of greater than 1. This shows that the model didn't perform particularly well, or isn't optimized well. For reference, the closer rmse is to 0, the better our model is. We also have a high mae, which isn't super great because the closer mae is to 0, the better. Between the two, it looks like Method 2. Portuguese for training and Maths for testing gave us better predictions. Let's try some classification methods now, and see if they are better at predicting.
+
 #### k-fold cross validation
 
 ```{r, eval = F}
-grades_folds <- vfold_cv(grades_train, v = 10, strata = G3)
-grades_folds
+#grades_folds <- vfold_cv(grades_train, v = 10, strata = G3)
 
 # lm engine
-lm_model <- linear_reg() %>% 
-  set_engine("lm")
+#lm_model <- linear_reg() %>% 
+#  set_engine("lm")
 # create workflow
-lm_wflow <- workflow() %>% 
-  add_model(lm_model) %>% 
-  add_recipe(grades_recipe1)
+#lm_wflow <- workflow() %>% 
+#  add_model(lm_model) %>% 
+#  add_recipe(grades_recipe1)
 
-fit_lm_kfold <- fit_resamples(lm_wflow,
-                        grades_folds,
-                        control = control_resamples(save_pred = TRUE)
-                        )
-collect_metrics(fit_lm_kfold)
+#fit_lm_kfold <- fit_resamples(lm_wflow,
+#                        grades_folds,
+#                        control = control_resamples(save_pred = TRUE)
+#                        )
+#collect_metrics(fit_lm_kfold)
 
-final_fit <- fit(lm_wflow, grades_train)
-final_fit
+#final_fit <- fit(lm_wflow, grades_train)
 
-grades_predicted <- predict(final_fit, new_data = grades_train)
-grades_predicted <- bind_cols(grades_predicted, grades_train %>% select(G3))
-grades_predicted
+#grades_predicted <- predict(final_fit, new_data = grades_train)
+#grades_predicted <- bind_cols(grades_predicted, grades_train %>% select(G3))
+#grades_predicted
 
-grades_predicted_test <- predict(final_fit, new_data = grades_test)
-grades_predicted_test <- bind_cols(grades_predicted_test, grades_test %>% select(G3))
-grades_predicted_test
+#grades_predicted_test <- predict(final_fit, new_data = grades_test)
+#grades_predicted_test <- bind_cols(grades_predicted_test, grades_test %>% select(G3))
+#grades_predicted_test
 
 # check average accuracy on test data
-grades_metrics <- metric_set(rmse, rsq, mae)
-grades_metrics(grades_predicted, truth = G3, 
-                estimate = .pred)
-grades_metrics(grades_predicted_test, truth = G3, 
-                estimate = .pred)
+#grades_metrics <- metric_set(rmse, rsq, mae)
+#grades_metrics(grades_predicted, truth = G3, 
+#                estimate = .pred)
+#grades_metrics(grades_predicted_test, truth = G3, 
+#                estimate = .pred)
 ```
 
 ```{r, eval = F}
-grades_folds2 <- vfold_cv(grades_train2, v = 10, strata = G3)
-grades_folds2
+#grades_folds2 <- vfold_cv(grades_train2, v = 10, strata = G3)
 
 # lm engine
-lm_model <- linear_reg() %>% 
-  set_engine("lm")
+#lm_model <- linear_reg() %>% 
+#  set_engine("lm")
 # create workflow
-lm_wflow2 <- workflow() %>% 
-  add_model(lm_model) %>% 
-  add_recipe(grades_recipe2)
+#lm_wflow2 <- workflow() %>% 
+#  add_model(lm_model) %>% 
+#  add_recipe(grades_recipe2)
 
-fit_lm2_kfold <- fit_resamples(lm_wflow2,
-                        grades_folds2,
-                        control = control_resamples(save_pred = TRUE)
-                        )
-collect_metrics(fit_lm2_kfold)
+#fit_lm2_kfold <- fit_resamples(lm_wflow2,
+#                        grades_folds2,
+#                        control = control_resamples(save_pred = TRUE)
+#                        )
+#collect_metrics(fit_lm2_kfold)
 
-final_fit2 <- fit(lm_wflow2, grades_train2)
-final_fit2
+#final_fit2 <- fit(lm_wflow2, grades_train2)
 
-grades_predicted2 <- predict(final_fit2, new_data = grades_train2)
-grades_predicted2 <- bind_cols(grades_predicted2, grades_train2_nocourse %>% select(G3))
-grades_predicted2
+#grades_predicted2 <- predict(final_fit2, new_data = grades_train2)
+#grades_predicted2 <- bind_cols(grades_predicted2, grades_train2_nocourse %>% select(G3))
+#grades_predicted2
 
-grades_predicted2_test <- predict(final_fit2, new_data = grades_test2)
-grades_predicted2_test <- bind_cols(grades_predicted2_test, grades_test2_nocourse %>% select(G3))
-grades_predicted2_test
+#grades_predicted2_test <- predict(final_fit2, new_data = grades_test2)
+#grades_predicted2_test <- bind_cols(grades_predicted2_test, grades_test2_nocourse %>% select(G3))
+#grades_predicted2_test
 
 # check average accuracy on test data
-grades_metrics <- metric_set(rmse, rsq, mae)
-grades_metrics(grades_predicted, truth = G3, 
-                estimate = .pred)
-grades_metrics(grades_predicted2, truth = G3, 
-                estimate = .pred)
+#grades_metrics <- metric_set(rmse, rsq, mae)
+#grades_metrics(grades_predicted, truth = G3, 
+#                estimate = .pred)
+#grades_metrics(grades_predicted2, truth = G3, 
+#                estimate = .pred)
 ```
 
 
 ### Classification
 
-Before we try fitting classification methods, there is one issue we should pay attention to. Earlier, we made a histogram of the distribution of G3 grades in the Maths and Portuguese classes. There were a large number of students who received G3 grades between 0, 5 and 15 than any other grade. For classification methods, we will need to convert G3 grades to a factor type. However, because some grades were "more common" (earned by more students than others), there may not be enough student grades data in each "grade category". (ex. students who got grade 0, grade 1, grade 2, etc.) 
-As we split the data and merge, we see below that this insufficiency of grades in each "category" creates inbalanced factor levels among the training and testing datasets. This will make it difficult to train any classification model, because when it comes to testing, should there be an observation with a G3 grade that did not show up in training, the model would not accurately recognize or predict the grade.
-It is important to keep this in mind, because having imbalanced factor levels will strongly impact the accuracy and results from any classification model we fit (seen later on). *CORRECT THIS PART, TALK ABOUT CONCERNS + HOW TO FIX*
+Before we try fitting classification methods, we should remember the issue discussed earlier. For classification methods, we will need to convert G3 grades to a factor type with different levels. However, because some grades were "more common" (earned by more students than others), there may not be enough student grades data in each "grade category". (ex. grade 0, grade 1, grade 2, etc.)
+If we create a level for each individual grade, we will run into the problem of disproportionate categories.
+Instead, (advised by my TA Hanmo) we can group the G3 grades into two levels of "Pass" and "Fail." The split between "Pass" and "Fail" is arbitrarily decided, it can be changed depending on the context/use of the model. I simply chose to group grades 0-10 as "Fail", and grades 11-20 as "Pass." Creating two new factor levels will hopefully remedy our problem of not having enough student grades in each category/level, because we are grouping much more data together.
+
+Before we fit any models however, we need to convert our outcome variable G3 into a factor and give it the new levels of "Pass" and "Fail." Again, we do this for the dataset that has course labels, and the dataset without course labels. Be sure to check that the new factor levels have been assigned correctly!
 
 ```{r}
-# convert outcome variable to factor first!!!
+# convert outcome variable to factor first
 
-# dataset without course labels
+# Method 1. dataset without course labels
 all_classes_fctr <- all_classes %>% mutate(G3 = factor(G3))
 all_classes_fctr$G3 %>% head()
 
@@ -303,16 +339,21 @@ levels(all_classes_fctr$G3) <- list("Fail"="0", "Fail"="1", "Fail"="4", "Fail"="
 # check that levels were reassigned correctly
 all_classes_fctr$G3 %>% head()
 
-# dataset with course labels
+
+# Method 2. dataset with course labels
 all_classes2_fctr <- all_classes2 %>% mutate(G3 = factor(G3))
-all_classes2_fctr %>% head()
+all_classes2_fctr$G3 %>% head()
 
 # if G3 between 0 and 10, level = Fail, if G3 between 11 and 20, level = Pass
 levels(all_classes2_fctr$G3) <- list("Fail"="0", "Fail"="1", "Fail"="4", "Fail"="5", "Fail"="6", "Fail"="7", "Fail"="8", "Fail"="9", "Fail"="10", "Pass"="11", "Pass"="12", "Pass"="13", "Pass"="14", "Pass"="15", "Pass"="16", "Pass"="17", "Pass"="18", "Pass"="19", "Pass"="20")
 
 # check that levels were reassigned correctly
 all_classes2_fctr$G3 %>% head()
+```
 
+We take our datasets with the new factor outcome variable and split it with two different ways, just like we did above. (1. large merged dataset, 2. Portuguese=training, Maths=testing)
+
+```{r}
 # Method 1. merged dataset
 # split data into training/testing
 grades_split_fctr <- initial_split(all_classes2_fctr, prop = 0.7,
@@ -331,239 +372,268 @@ grades_train2_fctr <- training(grades_split2_fctr)
 grades_test2_fctr <- testing(grades_split2_fctr)
 ```
 
-We can try out a couple of classification models anyway, just to see how they perform.
-
-#### 1. Logistic Regression Model (merged dataset)
+Let's make 2 recipes (same as above) for the classification models with the data, except this time our outcome G3 is a factor.
 
 ```{r}
-# logistic regression engine
-log_reg <- logistic_reg() %>% 
-  set_engine("glm")
+grades_recipe1_fctr <- recipe(G3 ~ ., data=all_classes2_fctr) %>%
+  step_dummy(all_nominal_predictors())
+
+grades_recipe2_fctr <- recipe(G3 ~ ., data=all_classes_fctr) %>%
+  step_dummy(all_nominal_predictors())
 ```
 
+For the classification models, let's begin with logistic regression. Then we'll try linear discriminant analysis (LDA) and quadratic discriminant analysis (QDA).
+
+#### Logistic Regression Model (Method 1. merged dataset)
 
 ```{r}
 # test out a logistic regression model on our merged dataset
+log_reg <- logistic_reg() %>% 
+  set_engine("glm")
 
-# create workflow and add recipe
+# create workflow
 log_wkflow <- workflow() %>% 
   add_model(log_reg) %>% 
-  add_recipe(grades_recipe1)
+  add_recipe(grades_recipe1_fctr)
 
+# fit
 log_fit <- fit(log_wkflow, grades_train_fctr)
 log_fit %>% 
   tidy()
 
+# predictions
 predict(log_fit, new_data = grades_train_fctr, type = "prob")
 
+# confusion matrix
 augment(log_fit, new_data = grades_train_fctr) %>%
   conf_mat(truth = G3, estimate = .pred_class)
 
+# accuracy
 log_reg_acc <- augment(log_fit, new_data = grades_train_fctr) %>%
   accuracy(truth = G3, estimate = .pred_class)
 log_reg_acc
 ```
 
-#### 2. Logistic Regression Model (Portuguese data for training, Maths data for testing)
+#### Logistic Regression Model (Method 2. Portuguese for training, Maths for testing)
 
 ```{r}
 # test out a logistic regression model on our second dataset (using Portuguese for training, Maths for testing)
+log_reg <- logistic_reg() %>% 
+  set_engine("glm")
 
 # create workflow
 log_wkflow2 <- workflow() %>% 
   add_model(log_reg) %>% 
-  add_recipe(grades_recipe2) # recipe from before
+  add_recipe(grades_recipe2_fctr)
 
+# fit
 log_fit2 <- fit(log_wkflow2, grades_train2_fctr)
 log_fit2 %>% 
   tidy()
 
+# predict
 predict(log_fit2, new_data = grades_train2_fctr, type = "prob")
 
+# confusion matrix
 augment(log_fit2, new_data = grades_train2_fctr) %>%
   conf_mat(truth = G3, estimate = .pred_class)
 
+# accuracy
 log_reg_acc2 <- augment(log_fit2, new_data = grades_train2_fctr) %>%
   accuracy(truth = G3, estimate = .pred_class)
 log_reg_acc2
 ```
 
-
-#### 1. Linear Discriminant Analysis (LDA) Model (merged dataset)
-
-```{r}
-# lda engine
-lda_mod <- discrim_linear() %>% 
-  set_mode("classification") %>% 
-  set_engine("MASS")
-```
-
+#### Linear Discriminant Analysis (LDA) Model (Method 1. merged dataset)
 
 ```{r}
 # test out a lda model on our merged dataset
+lda_mod <- discrim_linear() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
 
-# create workflow and add recipe
+# create workflow
 lda_wkflow <- workflow() %>% 
   add_model(lda_mod) %>% 
-  add_recipe(grades_recipe1)
+  add_recipe(grades_recipe1_fctr)
 
+# fit
 lda_fit <- fit(lda_wkflow, grades_train_fctr)
 
-# LDA model performance
+# predict
 predict(lda_fit, new_data = grades_train_fctr, type = "prob")
 
+# confusion matrix
 augment(lda_fit, new_data = grades_train_fctr) %>%
   conf_mat(truth = G3, estimate = .pred_class)
 
+# accuracy
 lda_acc <- augment(lda_fit, new_data = grades_train_fctr) %>%
   accuracy(truth = G3, estimate = .pred_class)
 lda_acc
 ```
 
-
-#### 2. Linear Discriminant Analysis (LDA) Model (Portuguese data for training, Maths data for testing)
+#### Linear Discriminant Analysis (LDA) Model (Method 2. Portuguese for training, Maths for testing)
 
 ```{r}
 # test out a lda model on our second dataset (using Portuguese for training, Maths for testing)
+lda_mod <- discrim_linear() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
 
 # create workflow and add recipe
 lda_wkflow2 <- workflow() %>% 
   add_model(lda_mod) %>% 
-  add_recipe(grades_recipe2)
+  add_recipe(grades_recipe2_fctr)
 
+# fit
 lda_fit2 <- fit(lda_wkflow2, grades_train2_fctr)
 
-# LDA model performance
+# predict
 predict(lda_fit2, new_data = grades_train2_fctr, type = "prob")
 
+# confusion matrix
 augment(lda_fit2, new_data = grades_train2_fctr) %>%
   conf_mat(truth = G3, estimate = .pred_class)
 
+# accuracy
 lda_acc2 <- augment(lda_fit2, new_data = grades_train2_fctr) %>%
   accuracy(truth = G3, estimate = .pred_class)
 lda_acc2
 ```
 
-#### 1. Quadratic Discriminant Analysis (QDA) Model (merged dataset)
-
-```{r}
-qda_mod <- discrim_quad() %>% 
-  set_mode("classification") %>% 
-  set_engine("MASS")
-```
-
+#### Quadratic Discriminant Analysis (QDA) Model (Method 1. merged dataset)
 
 ```{r}
 # test out a qda model on our merged dataset
+qda_mod <- discrim_quad() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
 
-# create workflow and add recipe
+# create workflow
 qda_wkflow <- workflow() %>% 
   add_model(qda_mod) %>% 
-  add_recipe(grades_recipe1) # recipe from before
+  add_recipe(grades_recipe1_fctr) # recipe from before
 
+# fit
 qda_fit <- fit(qda_wkflow, grades_train_fctr)
 
-# QDA model performance
+# predict
 predict(qda_fit, new_data = grades_train_fctr, type = "prob")
 
+# confusion matrix
 augment(qda_fit, new_data = grades_train_fctr) %>%
   conf_mat(truth = G3, estimate = .pred_class)
 
+# accuracy
 qda_acc <- augment(qda_fit, new_data = grades_train_fctr) %>%
   accuracy(truth = G3, estimate = .pred_class)
 qda_acc
 ```
 
-
-#### 2. Quadratic Discriminant Analysis (QDA) Model (Portuguese data for training, Maths data for testing)
+#### Quadratic Discriminant Analysis (QDA) Model (Method 2. Portuguese for training, Maths for testing)
 
 ```{r}
 # test out a ada model on our second dataset (using Portuguese for training, Maths for testing)
+qda_mod <- discrim_quad() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+# create workflow
 qda_wkflow2 <- workflow() %>% 
   add_model(qda_mod) %>% 
-  add_recipe(grades_recipe2) # recipe from before
+  add_recipe(grades_recipe2_fctr) # recipe from before
 
+# fit
 qda_fit2 <- fit(qda_wkflow2, grades_train2_fctr)
 
-# QDA model performance
+# predict
 predict(qda_fit2, new_data = grades_train2_fctr, type = "prob")
 
+# confusion matrix
 augment(qda_fit2, new_data = grades_train2_fctr) %>%
   conf_mat(truth = G3, estimate = .pred_class)
 
+# accuracy
 qda_acc2 <- augment(qda_fit2, new_data = grades_train2_fctr) %>%
   accuracy(truth = G3, estimate = .pred_class)
 qda_acc2
 ```
 
+From the three kinds of models, it seems like logistic regression performed the best, giving us the highest accuracy. For logistic regression and QDA, Method 2 (Portuguese=training, Maths=testing) of data splitting gave higher accuracy. But for QDA, Method 1 (merged dataset) gave a higher accuracy.
+
+
 ### k-fold cross validation
 
-As we try k-fold cross validation on the LDA model (performed best out of classification models), we see that the imbalanced "grade categories" from earlier becomes a problem. To compare the accuracy of the G3 prediction with the true value of G3, we need the same levels in both training and testing datasets. Unfortunately because the factor levels in training and testing datasets are unequal, we run into an error saying "truth (G3) and estimate (.pred_class)" must have the same levels in the same order.
+We can try k-fold cross validation on the model that performed best out of classification models (logistic regression)
+
+#### Method 1. merged dataset
 
 ```{r, message = F, warning = F}
+# 10-fold cross validation
 grades_folds_fctr <- vfold_cv(grades_train_fctr, v = 10)
-grades_folds_fctr
 
-# lda using MASS engine
-lda_mod <- discrim_linear() %>% 
-  set_mode("classification") %>% 
-  set_engine("MASS")
+# logistic regression model
+log_reg <- logistic_reg() %>% 
+  set_engine("glm")
+
 # create workflow
-lda_wkflow <- workflow() %>% 
-  add_model(lda_mod) %>% 
-  add_recipe(grades_recipe1)
+log_wkflow <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(grades_recipe1_fctr)
 
-fit_lda_kfold <- fit_resamples(lda_wkflow,
+# fit to the folds
+fit_log_kfold <- fit_resamples(log_wkflow,
                         grades_folds_fctr,
                         control = control_resamples(save_pred = TRUE)
                         )
-collect_metrics(fit_lda_kfold)
+collect_metrics(fit_log_kfold)
 
-final_fit <- fit(lda_wkflow, grades_train_fctr)
-final_fit
+# fit model to entire training dataset
+final_fit <- fit(log_wkflow, grades_train_fctr)
 
-# LDA model performance
-grades_predicted <- predict(final_fit, new_data = grades_test2_fctr)
-grades_predicted <- bind_cols(grades_predicted, grades_test2_fctr$G3)
+# fit model to testing dataset, bind predictions to actual observations
+grades_predicted <- predict(final_fit, new_data = grades_test_fctr)
+grades_predicted <- bind_cols(grades_predicted, grades_test_fctr$G3)
 grades_predicted
 
 # confusion matrix
-augment(final_fit, new_data = grades_test2_fctr) %>%
+augment(final_fit, new_data = grades_test_fctr) %>%
   conf_mat(truth = G3, estimate = .pred_class)
 
-# accuracy
-lda_acc_kfold <- augment(final_fit, new_data = grades_test2_fctr) %>%
-  accuracy(truth = grades_test2_fctr$G3, estimate = .pred_class)
-lda_acc_kfold
+# accuracy on testing dataset
+log_acc_kfold <- augment(final_fit, new_data = grades_test_fctr) %>%
+  accuracy(truth = grades_test_fctr$G3, estimate = .pred_class)
+log_acc_kfold
 ```
 
+#### Method 2. Portuguese for training, Maths for testing
 
 ```{r, message = F, warning = F}
+# 10-fold cross validation
 grades_folds2_fctr <- vfold_cv(grades_train2_fctr, v = 10)
-grades_folds2_fctr
 
-# lda using MASS engine
-lda_mod <- discrim_linear() %>% 
-  set_mode("classification") %>% 
-  set_engine("MASS")
+# logistic regression model
+log_reg <- logistic_reg() %>% 
+  set_engine("glm")
 
-# test out a lda model on our second dataset (using Portuguese for training, Maths for testing)
-lda_wkflow2 <- workflow() %>% 
-  add_model(lda_mod) %>% 
-  add_recipe(grades_recipe2) # recipe from before
+# create workflow
+log_wkflow2 <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(grades_recipe2_fctr)
 
-
-fit_lda2_kfold <- fit_resamples(lda_wkflow2,
+# fit model to folds
+fit_log2_kfold <- fit_resamples(log_wkflow2,
                         grades_folds2_fctr,
                         control = control_resamples(save_pred = TRUE)
                         )
 
-collect_metrics(fit_lda2_kfold)
+collect_metrics(fit_log2_kfold)
 
-final_fit2 <- fit(lda_wkflow2, grades_train_fctr)
-final_fit2
+# fit model to entire training dataset
+final_fit2 <- fit(log_wkflow2, grades_train2_fctr)
 
-# LDA model performance
+# fit model to testing dataset, bind predictions to actual observations
 grades_predicted2 <- predict(final_fit2, new_data = grades_test2_fctr, type = "prob")
 grades_predicted2 <- bind_cols(grades_predicted2, grades_test2_fctr$G3)
 grades_predicted2
@@ -573,7 +643,7 @@ augment(final_fit2, new_data = grades_test2_fctr) %>%
   conf_mat(truth = G3, estimate = .pred_class)
 
 # accuracy
-lda_acc2_kfold <- augment(final_fit2, new_data = grades_test2_fctr) %>%
+log_acc2_kfold <- augment(final_fit2, new_data = grades_test2_fctr) %>%
   accuracy(truth = grades_test2_fctr$G3, estimate = .pred_class)
-lda_acc2_kfold
+log_acc2_kfold
 ```
