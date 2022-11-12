@@ -27,6 +27,7 @@ library(discrim)
 library(poissonreg)
 library(corrr)
 library(klaR) # for naive bayes
+library(pROC) # needed for AUC
 tidymodels_prefer()
 ```
 
@@ -560,12 +561,12 @@ qda_acc2 <- augment(qda_fit2, new_data = grades_train2_fctr) %>%
 qda_acc2
 ```
 
-From the three kinds of models, it seems like logistic regression performed the best, giving us the highest accuracy. For logistic regression and QDA, Method 2 (Portuguese=training, Maths=testing) of data splitting gave higher accuracy. But for QDA, Method 1 (merged dataset) gave a higher accuracy.
+From the three kinds of models, it seems like logistic regression performed the best, giving us the highest accuracy of 0.9322034. We also notice that for logistic regression and QDA, Method 2 (Portuguese=training, Maths=testing) of data splitting gave higher accuracy. But for QDA, Method 1 (merged dataset) of data splitting gave a higher accuracy.
 
 
 ### k-fold cross validation
 
-We can try k-fold cross validation on the model that performed best out of classification models (logistic regression)
+We can try k-fold cross validation on the model that performed best out of classification models (logistic regression). Let's use 10 folds and try it on both the methods of data splitting. Will the Method 1. merged dataset or Method 2. Portuguese/Maths split dataset give us better results?
 
 #### Method 1. merged dataset
 
@@ -587,6 +588,7 @@ fit_log_kfold <- fit_resamples(log_wkflow,
                         grades_folds_fctr,
                         control = control_resamples(save_pred = TRUE)
                         )
+# accuracy on training dataset
 collect_metrics(fit_log_kfold)
 
 # fit model to entire training dataset
@@ -602,8 +604,9 @@ augment(final_fit, new_data = grades_test_fctr) %>%
   conf_mat(truth = G3, estimate = .pred_class)
 
 # accuracy on testing dataset
+multi_metric <- metric_set(accuracy, sensitivity, specificity)
 log_acc_kfold <- augment(final_fit, new_data = grades_test_fctr) %>%
-  accuracy(truth = grades_test_fctr$G3, estimate = .pred_class)
+  multi_metric(truth = grades_test_fctr$G3, estimate = .pred_class)
 log_acc_kfold
 ```
 
@@ -627,7 +630,7 @@ fit_log2_kfold <- fit_resamples(log_wkflow2,
                         grades_folds2_fctr,
                         control = control_resamples(save_pred = TRUE)
                         )
-
+# accuracy on training dataset
 collect_metrics(fit_log2_kfold)
 
 # fit model to entire training dataset
@@ -643,7 +646,34 @@ augment(final_fit2, new_data = grades_test2_fctr) %>%
   conf_mat(truth = G3, estimate = .pred_class)
 
 # accuracy
+multi_metric <- metric_set(accuracy, sensitivity, specificity)
 log_acc2_kfold <- augment(final_fit2, new_data = grades_test2_fctr) %>%
-  accuracy(truth = grades_test2_fctr$G3, estimate = .pred_class)
+  multi_metric(truth = grades_test2_fctr$G3, estimate = .pred_class)
 log_acc2_kfold
 ```
+
+By comparing the testing accuracy, it looks like the model that used Method 1. merged dataset actually gave higher accuracy than Method 2. Portuguese for training, Maths for testing. The accuracy from Method 1. is 0.9235669, the accuracy from Method 2. is 0.8936709. The difference between the two accuracies is only about 0.03. This is opposite of what we saw when we used the training data. Let's plot their respective ROC curves to see if the visual results are consistent.
+
+```{r, message = F, warning = F}
+# ROC curves
+# Method 1. merged dataset
+augment(final_fit, new_data = grades_test_fctr) %>%
+  roc_curve(truth = grades_test_fctr$G3, estimate = .pred_Fail) %>%
+  autoplot()
+
+# calculate AUC
+pred_Fail <- as.data.frame(predict(final_fit, new_data = grades_test_fctr, type = "prob"))[,1]
+auc(grades_test_fctr$G3, pred_Fail)
+
+# Method 2. Portuguese for training, Maths for testing
+augment(final_fit2, new_data = grades_test2_fctr) %>%
+  roc_curve(truth = grades_test2_fctr$G3, estimate = .pred_Fail) %>%
+  autoplot()
+
+# calculate AUC
+pred_Fail2 <- as.data.frame(predict(final_fit2, new_data = grades_test2_fctr, type = "prob"))[,1]
+auc(grades_test2_fctr$G3, pred_Fail2)
+```
+
+As expected, the ROC curves of the accuracies from the two different methods are extremely similar, with slight variation at the middle of the curve. If we calculate the AUC (area under the curve) for the two methods, we see that the AUC for Method 1 is 0.9766 which is slightly bigger than the AUC for method 2, 0.9712. This is consistent with our results from the accuracy metrics above.
+
