@@ -26,8 +26,12 @@ library(MASS)
 library(discrim)
 library(poissonreg)
 library(corrr)
-library(klaR) # for naive bayes
 library(pROC) # needed for AUC
+library(janitor)
+library(rpart.plot)
+library(vip)
+library(randomForest)
+library(xgboost)
 tidymodels_prefer()
 ```
 
@@ -37,13 +41,14 @@ After installing necessary packages, we read in our two datasets for the classes
 # read in the Maths dataset
 Maths <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/Maths.csv",
                   show_col_types = FALSE)
+Maths <- clean_names(Maths)
 Maths %>% head()
 
 # number of observations in Maths
 dim(Maths)
 
 # distribution of G3 grades in Maths
-hist(Maths$G3,
+hist(Maths$g3,
      breaks=19,
      xlab = "student final grades (G3) in Maths",
      ylab = "count")
@@ -51,13 +56,14 @@ hist(Maths$G3,
 # read in the Portuguese dataset
 Portuguese <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/Portuguese.csv",
                        show_col_types = FALSE)
+Portuguese <- clean_names(Portuguese)
 Portuguese %>% head()
 
 # number of observations in Portuguese
 dim(Portuguese)
 
 # distribution of G3 grades in Portuguese
-hist(Portuguese$G3,
+hist(Portuguese$g3,
      breaks=19,
      xlab = "student final grades (G3) in Portuguese",
      ylab = "count")
@@ -69,13 +75,15 @@ Let's add a variable called "course" so we know which observations are from whic
 
 ```{r}
 # add course = "Maths" as a predictor to label the dataset
-course <- rep("Maths", times=395)
+course <- rep("maths", times=395)
 Maths_new <- cbind(Maths, course)
+Maths_new <- clean_names(Maths_new)
 Maths_new %>% head()
 
 # add course = "Portuguese" as a predictor to label the dataset
-course <- rep("Portuguese", times=649)
+course <- rep("portuguese", times=649)
 Portuguese_new <- cbind(Portuguese, course)
+Portuguese_new <- clean_names(Portuguese_new)
 Portuguese_new %>% head()
 ```
 
@@ -105,7 +113,7 @@ all_classes2 %>% head()
 # split labeled, merged dataset into training and testing
 set.seed(3435)
 grades_split <- initial_split(all_classes2, prop = 0.7,
-                              strata = G3)
+                              strata = g3)
 grades_train <- training(grades_split)
 grades_test <- testing(grades_split)
 ```
@@ -152,10 +160,10 @@ We will make 2 recipes, the first one we use when working with Method 1. merged 
 The reason for this is because for Method 2, we split the data into training/testing by course. However, when we fit models and predict, having course=Portuguese for training and course=Math throws an error because the model won't know how to carry over its training knowledge to testing when the two courses are not the same. Therefore we need this 2nd recipe without the course variable, and we need grades_train2_nocourse and grades_test2_nocourse to fit the model.
 
 ```{r}
-grades_recipe1 <- recipe(G3 ~ ., data=all_classes2) %>%
+grades_recipe1 <- recipe(g3 ~ ., data=all_classes2) %>%
   step_dummy(all_nominal_predictors())
 
-grades_recipe2 <- recipe(G3 ~ ., data=all_classes) %>%
+grades_recipe2 <- recipe(g3 ~ ., data=all_classes) %>%
   step_dummy(all_nominal_predictors())
 ```
 
@@ -184,14 +192,14 @@ lm_fit %>%
   tidy()
 
 # put predictions and actual observations together
-grades_train_res <- predict(lm_fit, new_data = grades_train %>% select(-G3))
-grades_train_res <- bind_cols(grades_train_res, grades_train %>% select(G3))
+grades_train_res <- predict(lm_fit, new_data = grades_train %>% select(-g3))
+grades_train_res <- bind_cols(grades_train_res, grades_train %>% select(g3))
 grades_train_res %>% 
   head()
 
 # plot to visualize
 grades_train_res %>% 
-  ggplot(aes(x = .pred, y = G3)) +
+  ggplot(aes(x = .pred, y = g3)) +
   geom_point(alpha = 0.2) +
   geom_abline(lty = 2) + 
   theme_bw() +
@@ -199,7 +207,7 @@ grades_train_res %>%
 
 # our metrics
 grades_metrics1 <- metric_set(rmse, rsq, mae)
-grades_metrics1(grades_train_res, truth = G3, 
+grades_metrics1(grades_train_res, truth = g3, 
                 estimate = .pred)
 ```
 
@@ -225,14 +233,14 @@ lm_fit %>%
   tidy()
 
 # put predictions and actual observations together
-grades_train_res2 <- predict(lm_fit, new_data = grades_train2 %>% select(-G3))
-grades_train_res2 <- bind_cols(grades_train_res2, grades_train2_nocourse %>% select(G3))
+grades_train_res2 <- predict(lm_fit, new_data = grades_train2 %>% select(-g3))
+grades_train_res2 <- bind_cols(grades_train_res2, grades_train2_nocourse %>% select(g3))
 grades_train_res2 %>% 
   head()
 
 # plot to visualize
 grades_train_res2 %>% 
-  ggplot(aes(x = .pred, y = G3)) +
+  ggplot(aes(x = .pred, y = g3)) +
   geom_point(alpha = 0.2) +
   geom_abline(lty = 2) + 
   theme_bw() +
@@ -240,7 +248,7 @@ grades_train_res2 %>%
 
 # our metrics
 grades_metrics2 <- metric_set(rmse, rsq, mae)
-grades_metrics2(grades_train_res2, truth = G3, 
+grades_metrics2(grades_train_res2, truth = g3, 
                 estimate = .pred)
 ```
 
@@ -331,25 +339,25 @@ Before we fit any models however, we need to convert our outcome variable G3 int
 # convert outcome variable to factor first
 
 # Method 1. dataset without course labels
-all_classes_fctr <- all_classes %>% mutate(G3 = factor(G3))
-all_classes_fctr$G3 %>% head()
+all_classes_fctr <- all_classes %>% mutate(g3 = factor(g3))
+all_classes_fctr$g3 %>% head()
 
 # if G3 between 0 and 10, level = Fail, if G3 between 11 and 20, level = Pass
-levels(all_classes_fctr$G3) <- list("Fail"="0", "Fail"="1", "Fail"="4", "Fail"="5", "Fail"="6", "Fail"="7", "Fail"="8", "Fail"="9", "Fail"="10", "Pass"="11", "Pass"="12", "Pass"="13", "Pass"="14", "Pass"="15", "Pass"="16", "Pass"="17", "Pass"="18", "Pass"="19", "Pass"="20")
+levels(all_classes_fctr$g3) <- list("Fail"="0", "Fail"="1", "Fail"="4", "Fail"="5", "Fail"="6", "Fail"="7", "Fail"="8", "Fail"="9", "Fail"="10", "Pass"="11", "Pass"="12", "Pass"="13", "Pass"="14", "Pass"="15", "Pass"="16", "Pass"="17", "Pass"="18", "Pass"="19", "Pass"="20")
 
 # check that levels were reassigned correctly
-all_classes_fctr$G3 %>% head()
+all_classes_fctr$g3 %>% head()
 
 
 # Method 2. dataset with course labels
-all_classes2_fctr <- all_classes2 %>% mutate(G3 = factor(G3))
-all_classes2_fctr$G3 %>% head()
+all_classes2_fctr <- all_classes2 %>% mutate(g3 = factor(g3))
+all_classes2_fctr$g3 %>% head()
 
 # if G3 between 0 and 10, level = Fail, if G3 between 11 and 20, level = Pass
-levels(all_classes2_fctr$G3) <- list("Fail"="0", "Fail"="1", "Fail"="4", "Fail"="5", "Fail"="6", "Fail"="7", "Fail"="8", "Fail"="9", "Fail"="10", "Pass"="11", "Pass"="12", "Pass"="13", "Pass"="14", "Pass"="15", "Pass"="16", "Pass"="17", "Pass"="18", "Pass"="19", "Pass"="20")
+levels(all_classes2_fctr$g3) <- list("Fail"="0", "Fail"="1", "Fail"="4", "Fail"="5", "Fail"="6", "Fail"="7", "Fail"="8", "Fail"="9", "Fail"="10", "Pass"="11", "Pass"="12", "Pass"="13", "Pass"="14", "Pass"="15", "Pass"="16", "Pass"="17", "Pass"="18", "Pass"="19", "Pass"="20")
 
 # check that levels were reassigned correctly
-all_classes2_fctr$G3 %>% head()
+all_classes2_fctr$g3 %>% head()
 ```
 
 We take our datasets with the new factor outcome variable and split it with two different ways, just like we did above. (1. large merged dataset, 2. Portuguese=training, Maths=testing)
@@ -358,7 +366,7 @@ We take our datasets with the new factor outcome variable and split it with two 
 # Method 1. merged dataset
 # split data into training/testing
 grades_split_fctr <- initial_split(all_classes2_fctr, prop = 0.7,
-                               strata = G3)
+                               strata = g3)
 grades_train_fctr <- training(grades_split_fctr)
 grades_test_fctr <- testing(grades_split_fctr)
 
@@ -371,15 +379,21 @@ grades_split2_fctr <- group_initial_split(all_classes2_fctr, group = course,
 grades_train2_fctr <- training(grades_split2_fctr)
 # use Maths for testing
 grades_test2_fctr <- testing(grades_split2_fctr)
+
+# remove course labels (may cause problems when we train/test)
+grades_train2_fctr_nocourse <- grades_train2_fctr %>%
+  select(-course)
+grades_test2_fctr_nocourse <- grades_test2_fctr %>%
+  select(-course)
 ```
 
 Let's make 2 recipes (same as above) for the classification models with the data, except this time our outcome G3 is a factor.
 
 ```{r}
-grades_recipe1_fctr <- recipe(G3 ~ ., data=all_classes2_fctr) %>%
+grades_recipe1_fctr <- recipe(g3 ~ ., data=all_classes2_fctr) %>%
   step_dummy(all_nominal_predictors())
 
-grades_recipe2_fctr <- recipe(G3 ~ ., data=all_classes_fctr) %>%
+grades_recipe2_fctr <- recipe(g3 ~ ., data=all_classes_fctr) %>%
   step_dummy(all_nominal_predictors())
 ```
 
@@ -407,11 +421,11 @@ predict(log_fit, new_data = grades_train_fctr, type = "prob")
 
 # confusion matrix
 augment(log_fit, new_data = grades_train_fctr) %>%
-  conf_mat(truth = G3, estimate = .pred_class)
+  conf_mat(truth = g3, estimate = .pred_class)
 
 # accuracy
 log_reg_acc <- augment(log_fit, new_data = grades_train_fctr) %>%
-  accuracy(truth = G3, estimate = .pred_class)
+  accuracy(truth = g3, estimate = .pred_class)
 log_reg_acc
 ```
 
@@ -437,11 +451,11 @@ predict(log_fit2, new_data = grades_train2_fctr, type = "prob")
 
 # confusion matrix
 augment(log_fit2, new_data = grades_train2_fctr) %>%
-  conf_mat(truth = G3, estimate = .pred_class)
+  conf_mat(truth = g3, estimate = .pred_class)
 
 # accuracy
 log_reg_acc2 <- augment(log_fit2, new_data = grades_train2_fctr) %>%
-  accuracy(truth = G3, estimate = .pred_class)
+  accuracy(truth = g3, estimate = .pred_class)
 log_reg_acc2
 ```
 
@@ -466,11 +480,11 @@ predict(lda_fit, new_data = grades_train_fctr, type = "prob")
 
 # confusion matrix
 augment(lda_fit, new_data = grades_train_fctr) %>%
-  conf_mat(truth = G3, estimate = .pred_class)
+  conf_mat(truth = g3, estimate = .pred_class)
 
 # accuracy
 lda_acc <- augment(lda_fit, new_data = grades_train_fctr) %>%
-  accuracy(truth = G3, estimate = .pred_class)
+  accuracy(truth = g3, estimate = .pred_class)
 lda_acc
 ```
 
@@ -495,11 +509,11 @@ predict(lda_fit2, new_data = grades_train2_fctr, type = "prob")
 
 # confusion matrix
 augment(lda_fit2, new_data = grades_train2_fctr) %>%
-  conf_mat(truth = G3, estimate = .pred_class)
+  conf_mat(truth = g3, estimate = .pred_class)
 
 # accuracy
 lda_acc2 <- augment(lda_fit2, new_data = grades_train2_fctr) %>%
-  accuracy(truth = G3, estimate = .pred_class)
+  accuracy(truth = g3, estimate = .pred_class)
 lda_acc2
 ```
 
@@ -524,11 +538,11 @@ predict(qda_fit, new_data = grades_train_fctr, type = "prob")
 
 # confusion matrix
 augment(qda_fit, new_data = grades_train_fctr) %>%
-  conf_mat(truth = G3, estimate = .pred_class)
+  conf_mat(truth = g3, estimate = .pred_class)
 
 # accuracy
 qda_acc <- augment(qda_fit, new_data = grades_train_fctr) %>%
-  accuracy(truth = G3, estimate = .pred_class)
+  accuracy(truth = g3, estimate = .pred_class)
 qda_acc
 ```
 
@@ -553,11 +567,11 @@ predict(qda_fit2, new_data = grades_train2_fctr, type = "prob")
 
 # confusion matrix
 augment(qda_fit2, new_data = grades_train2_fctr) %>%
-  conf_mat(truth = G3, estimate = .pred_class)
+  conf_mat(truth = g3, estimate = .pred_class)
 
 # accuracy
 qda_acc2 <- augment(qda_fit2, new_data = grades_train2_fctr) %>%
-  accuracy(truth = G3, estimate = .pred_class)
+  accuracy(truth = g3, estimate = .pred_class)
 qda_acc2
 ```
 
@@ -596,17 +610,17 @@ final_fit <- fit(log_wkflow, grades_train_fctr)
 
 # fit model to testing dataset, bind predictions to actual observations
 grades_predicted <- predict(final_fit, new_data = grades_test_fctr)
-grades_predicted <- bind_cols(grades_predicted, grades_test_fctr$G3)
+grades_predicted <- bind_cols(grades_predicted, grades_test_fctr$g3)
 grades_predicted
 
 # confusion matrix
 augment(final_fit, new_data = grades_test_fctr) %>%
-  conf_mat(truth = G3, estimate = .pred_class)
+  conf_mat(truth = g3, estimate = .pred_class)
 
 # accuracy on testing dataset
 multi_metric <- metric_set(accuracy, sensitivity, specificity)
 log_acc_kfold <- augment(final_fit, new_data = grades_test_fctr) %>%
-  multi_metric(truth = grades_test_fctr$G3, estimate = .pred_class)
+  multi_metric(truth = grades_test_fctr$g3, estimate = .pred_class)
 log_acc_kfold
 ```
 
@@ -638,17 +652,17 @@ final_fit2 <- fit(log_wkflow2, grades_train2_fctr)
 
 # fit model to testing dataset, bind predictions to actual observations
 grades_predicted2 <- predict(final_fit2, new_data = grades_test2_fctr, type = "prob")
-grades_predicted2 <- bind_cols(grades_predicted2, grades_test2_fctr$G3)
+grades_predicted2 <- bind_cols(grades_predicted2, grades_test2_fctr$g3)
 grades_predicted2
 
 # confusion matrix
 augment(final_fit2, new_data = grades_test2_fctr) %>%
-  conf_mat(truth = G3, estimate = .pred_class)
+  conf_mat(truth = g3, estimate = .pred_class)
 
 # accuracy
 multi_metric <- metric_set(accuracy, sensitivity, specificity)
 log_acc2_kfold <- augment(final_fit2, new_data = grades_test2_fctr) %>%
-  multi_metric(truth = grades_test2_fctr$G3, estimate = .pred_class)
+  multi_metric(truth = grades_test2_fctr$g3, estimate = .pred_class)
 log_acc2_kfold
 ```
 
@@ -658,22 +672,435 @@ By comparing the testing accuracy, it looks like the model that used Method 1. m
 # ROC curves
 # Method 1. merged dataset
 augment(final_fit, new_data = grades_test_fctr) %>%
-  roc_curve(truth = grades_test_fctr$G3, estimate = .pred_Fail) %>%
+  roc_curve(truth = grades_test_fctr$g3, estimate = .pred_Fail) %>%
   autoplot()
 
 # calculate AUC
 pred_Fail <- as.data.frame(predict(final_fit, new_data = grades_test_fctr, type = "prob"))[,1]
-auc(grades_test_fctr$G3, pred_Fail)
+auc(grades_test_fctr$g3, pred_Fail)
 
 # Method 2. Portuguese for training, Maths for testing
 augment(final_fit2, new_data = grades_test2_fctr) %>%
-  roc_curve(truth = grades_test2_fctr$G3, estimate = .pred_Fail) %>%
+  roc_curve(truth = grades_test2_fctr$g3, estimate = .pred_Fail) %>%
   autoplot()
 
 # calculate AUC
 pred_Fail2 <- as.data.frame(predict(final_fit2, new_data = grades_test2_fctr, type = "prob"))[,1]
-auc(grades_test2_fctr$G3, pred_Fail2)
+auc(grades_test2_fctr$g3, pred_Fail2)
 ```
 
 As expected, the ROC curves of the accuracies from the two different methods are extremely similar, with slight variation at the middle of the curve. If we calculate the AUC (area under the curve) for the two methods, we see that the AUC for Method 1 is 0.9766 which is slightly bigger than the AUC for method 2, 0.9712. This is consistent with our results from the accuracy metrics above.
+
+### Elastic Net Tuning
+
+Next, let's try the elastic net method, where we tune the parameters of mixture and penalty. This is an a model that uses an "in between" penalty term in comparison to ridge and lasso regression (where the penalty terms are 0 and as close to infinity as possible, respectively). Note, we use multinomial regression, which is generally used to predict an outcome with several factor levels. Before we fit the models, we first update our recipes from earlier by centering and scaling our predictors.
+
+```{r}
+# update recipes by centering and scaling predictors 
+grades_recipe1_fctr_new <- recipe(g3 ~ ., data=all_classes2_fctr) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_center(all_predictors()) %>% # center predictors
+  step_scale(all_predictors()) # scale predictors
+
+grades_recipe2_fctr_new <- recipe(g3 ~ ., data=all_classes_fctr) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_center(all_predictors()) %>% # center predictors
+  step_scale(all_predictors()) # scale predictors
+```
+
+Again, we fit the elastic net model to both our method 1. merged dataset and method 2. Portugese=training, Maths=testing data to see which gives us better results.
+
+#### Method 1. merged dataset
+
+```{r}
+# 5-fold cross validation
+grades_folds_fctr_new <- vfold_cv(grades_train_fctr, v = 5, strata = g3)
+
+# elastic net model
+multinom_reg_model <- multinom_reg(mixture = tune(), penalty = tune()) %>% 
+  set_mode("classification") %>%
+  set_engine("glmnet")
+
+# create workflow
+multinom_reg_wf <- workflow() %>%
+  add_model(multinom_reg_model) %>% # add model
+  add_recipe(grades_recipe1_fctr_new) # add recipe
+
+# grid for penalty and mixture
+grid_pm_en <- grid_regular(mixture(range = c(0, 1)), penalty(range = c(-5, 5)), levels = c(mixture = 10, penalty = 10))
+```
+
+```{r, eval = F}
+tune_res_elasticnet <- tune_grid(
+  object = multinom_reg_wf, 
+  resamples = grades_folds_fctr_new, 
+  grid = grid_pm_en
+)
+
+# write file
+write_rds(tune_res_elasticnet, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/tune_res_elasticnet.rds")
+```
+
+```{r}
+# read file
+tune_res_elasticnet <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131//Final-Project/Final-Project-laurenrhuang/tune_res_elasticnet.rds")
+
+# autoplot
+autoplot(tune_res_elasticnet)
+```
+
+```{r}
+# show the best models according to roc_auc
+show_best(tune_res_elasticnet, metric = "roc_auc")
+
+# select the best
+en_best_rocauc <- select_best(tune_res_elasticnet, metric = "roc_auc")
+en_best_rocauc
+
+# fit model to training set
+elasticnet1_final <- finalize_workflow(multinom_reg_wf, en_best_rocauc)
+elasticnet1_final_fit <- fit(elasticnet1_final, data = grades_train_fctr)
+
+# evaluate accuracy
+augment(elasticnet1_final_fit, new_data = grades_test_fctr) %>%
+  accuracy(truth = g3, estimate = .pred_class)
+```
+
+We do the same for Method 2. Portuguese = training, Maths = testing
+
+#### Method 2. Portuguese for training, Maths for testing
+
+```{r}
+# 5-fold cross validation
+grades_folds2_fctr_new <- vfold_cv(grades_train2_fctr_nocourse, v = 5, strata = g3)
+
+# elastic net model
+multinom_reg_model <- multinom_reg(mixture = tune(), penalty = tune()) %>% 
+  set_mode("classification") %>%
+  set_engine("glmnet")
+
+# create workflow
+multinom_reg_wf2 <- workflow() %>%
+  add_model(multinom_reg_model) %>% # add model
+  add_recipe(grades_recipe2_fctr_new) # add recipe
+```
+
+```{r, eval = F}
+tune_res_elasticnet2 <- tune_grid(
+  object = multinom_reg_wf2, 
+  resamples = grades_folds2_fctr_new, 
+  grid = grid_pm_en
+)
+
+# write file
+write_rds(tune_res_elasticnet2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/tune_res_elasticnet2.rds")
+```
+
+```{r}
+# read file
+tune_res_elasticnet2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/tune_res_elasticnet2.rds")
+
+# autoplot
+autoplot(tune_res_elasticnet2)
+```
+
+```{r}
+# show the best models according to roc_auc
+show_best(tune_res_elasticnet2, metric = "roc_auc")
+
+# select the best
+en_best_rocauc2 <- select_best(tune_res_elasticnet2, metric = "roc_auc")
+en_best_rocauc2
+
+# fit model to training set
+elasticnet2_final <- finalize_workflow(multinom_reg_wf2, en_best_rocauc2)
+elasticnet2_final_fit <- fit(elasticnet2_final, data = grades_train2_fctr_nocourse)
+
+# evaluate accuracy
+augment(elasticnet2_final_fit, new_data = grades_test2_fctr_nocourse) %>%
+  accuracy(truth = g3, estimate = .pred_class)
+```
+
+
+As we saw above, it seems like Method 1. merged dataset gave us better accuracy when fitted to the elastic net model. Let's investigate the details of this model by calculating AUC, roc_auc, and plotting ROC curves. We also make a heatmap confusion matrix.
+
+```{r, warning = F, message = F}
+# convert predicted values
+pred_class <- as.data.frame(predict(elasticnet1_final_fit, new_data = grades_test_fctr, type = "prob"))[,1]
+
+# calculate AUC
+auc(grades_test_fctr$g3, pred_class)
+
+# metrics
+multi_metric <- metric_set(accuracy, sensitivity, specificity)
+augment(elasticnet1_final_fit, new_data = grades_test_fctr) %>%
+  multi_metric(truth = g3, estimate = .pred_class)
+
+# ROC curves
+augment(elasticnet1_final_fit, new_data = grades_test_fctr) %>%
+  roc_curve(truth = g3, estimate = .pred_Fail) %>%
+  autoplot()
+
+# confusion matrix
+augment(elasticnet1_final_fit, new_data = grades_test_fctr) %>%
+  conf_mat(truth = g3, estimate = .pred_class) %>%
+  autoplot(type = "heatmap")
+
+# ROC_AUC
+predicted_data <- augment(elasticnet1_final_fit, new_data = grades_test_fctr) %>%
+  select(g3, starts_with(".pred"))
+predicted_data %>% roc_auc(g3, .pred_Fail)
+```
+
+### Decision Tree
+
+#### Method 1. merged dataset
+
+```{r}
+# decision tree engine
+tree_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+# create workflow
+class_tree_wf <- workflow() %>%
+  add_model(tree_spec %>% set_args(cost_complexity = tune())) %>%
+  add_recipe(grades_recipe1_fctr_new)
+
+# create grid
+set.seed(3435)
+param_grid <- grid_regular(cost_complexity(range = c(-3, -1)), levels = 10)
+```
+
+```{r}
+# fit with tune_grid
+classtree_tune_res <- tune_grid(
+  class_tree_wf, 
+  resamples = grades_folds_fctr_new, 
+  grid = param_grid, 
+  metrics = metric_set(accuracy)
+)
+
+# write file
+write_rds(tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/classtree_tune_res.rds")
+```
+
+```{r}
+# read file
+classtree_tune_res <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/classtree_tune_res.rds")
+
+# cost-complexity accuracy autoplot
+autoplot(classtree_tune_res)
+```
+
+```{r}
+# show metrics
+collect_metrics(classtree_tune_res) %>% arrange(desc(mean))
+
+# select the best
+classtree_best_complexity <- select_best(classtree_tune_res)
+classtree_best_complexity
+
+# fit
+classtree_final1 <- finalize_workflow(class_tree_wf, classtree_best_complexity)
+classtree_final1_fit <- fit(classtree_final1, data = grades_train_fctr)
+
+# roc_auc
+predicted_data <- augment(classtree_final1_fit, new_data = grades_train_fctr) %>%
+  select(g3, starts_with(".pred"))
+predicted_data %>% roc_auc(g3, .pred_Fail)
+```
+
+
+#### Method 2. Portuguese for training, Maths for testing
+
+```{r}
+# decision tree engine
+tree_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+# create workflow
+class_tree_wf2 <- workflow() %>%
+  add_model(tree_spec %>% set_args(cost_complexity = tune())) %>%
+  add_recipe(grades_recipe2_fctr_new)
+```
+
+```{r}
+# fit with tune_grid
+classtree_tune_res2 <- tune_grid(
+  class_tree_wf2, 
+  resamples = grades_folds2_fctr_new, 
+  grid = param_grid, 
+  metrics = metric_set(accuracy)
+)
+# write file
+write_rds(classtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/classtree_tune_res2.rds")
+```
+
+```{r}
+# read file
+classtree_tune_res2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/classtree_tune_res2.rds")
+# cost-complexity accuracy autoplot
+autoplot(classtree_tune_res2)
+```
+
+```{r}
+# show metrics
+collect_metrics(classtree_tune_res2) %>% arrange(desc(mean))
+
+# select the best
+classtree_best_complexity2 <- select_best(classtree_tune_res2)
+classtree_best_complexity2
+
+# fit
+classtree_final2 <- finalize_workflow(class_tree_wf2, classtree_best_complexity2)
+classtree_final_fit2 <- fit(classtree_final2, data = grades_train2_fctr_nocourse)
+
+# roc_auc
+predicted_data <- augment(classtree_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
+  select(g3, starts_with(".pred"))
+predicted_data %>% roc_auc(g3, .pred_Fail)
+```
+
+
+
+### Boosted Tree
+
+#### Method 1. merged dataset
+
+*FIXME CHECK ROC AUC*
+
+```{r}
+# set boosted tree engine
+xgb_spec <- boost_tree() %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+# create workflow
+xgb_wf <- workflow() %>%
+  add_model(xgb_spec %>% set_args(trees = tune())) %>%
+  add_recipe(grades_recipe1_fctr_new)
+
+# create grid
+param_grid2 <- grid_regular(trees(range = c(10, 2000)),
+                            levels = 10)
+```
+
+```{r}
+# fit using tune_grid
+boostedtree_tune_res <- tune_grid(
+  xgb_wf, 
+  resamples = grades_folds_fctr_new, 
+  grid = param_grid2, 
+  metrics = metric_set(accuracy)
+)
+# write file
+write_rds(boostedtree_tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/boostedtree_tune_res.rds")
+```
+
+```{r}
+# read file
+boostedtree_tune_res <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/boostedtree_tune_res.rds")
+
+# autoplot
+autoplot(boostedtree_tune_res)
+
+# show metrics
+collect_metrics(boostedtree_tune_res) %>% arrange(desc(mean))
+
+# select the best
+boostedtree_best_complexity <- select_best(boostedtree_tune_res)
+boostedtree_best_complexity
+
+# fit
+xgb_final1 <- finalize_workflow(xgb_wf, boostedtree_best_complexity)
+xgb_final_fit1 <- fit(xgb_final1, data = grades_train_fctr)
+predicted_data2 <- augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
+  select(g3, starts_with(".pred"))
+
+# roc_auc
+predicted_data2 %>% roc_auc(g3, .pred_Fail)
+```
+
+
+#### Method 2. Portuguese for training, Maths for testing
+
+*FIXME CHECK ROC AUC*
+
+```{r}
+# set boosted tree engine
+xgb_spec <- boost_tree() %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+# create workflow
+xgb_wf2 <- workflow() %>%
+  add_model(xgb_spec %>% set_args(trees = tune())) %>%
+  add_recipe(grades_recipe2_fctr_new)
+
+# create grid
+param_grid2 <- grid_regular(trees(range = c(10, 2000)),
+                            levels = 10)
+```
+
+```{r}
+# fit using tune_grid
+boostedtree_tune_res2 <- tune_grid(
+  xgb_wf2, 
+  resamples = grades_folds2_fctr_new, 
+  grid = param_grid2, 
+  metrics = metric_set(accuracy)
+)
+# write file
+write_rds(boostedtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/boostedtree_tune_res2.rds")
+```
+
+```{r}
+# read file
+boostedtree_tune_res2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/boostedtree_tune_res2.rds")
+
+# autoplot
+autoplot(boostedtree_tune_res2)
+
+# show metrics
+collect_metrics(boostedtree_tune_res2) %>% arrange(desc(mean))
+
+# select the best
+boostedtree_best_complexity2 <- select_best(boostedtree_tune_res2)
+boostedtree_best_complexity2
+
+# fit
+xgb_final2 <- finalize_workflow(xgb_wf2, boostedtree_best_complexity2)
+xgb_final_fit2 <- fit(xgb_final2, data = grades_train2_fctr_nocourse)
+predicted_data2 <- augment(xgb_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
+  select(g3, starts_with(".pred"))
+
+# roc_auc
+predicted_data2 %>% roc_auc(g3, .pred_Fail)
+```
+
+```{r}
+# select the best (boosted tree)
+best_rocauc <- select_best(boostedtree_tune_res2)
+
+# fit
+rocauc_final <- finalize_workflow(xgb_wf2, boostedtree_best_complexity2)
+rocauc_final_fit <- fit(rocauc_final, data = grades_train2_fctr_nocourse)
+predicted_data_final <- augment(xgb_final_fit2, new_data = grades_test2_fctr_nocourse) %>%
+  select(g3, starts_with(".pred"))
+
+# roc_auc
+predicted_data_final %>% roc_auc(g3, .pred_Fail)
+
+# roc curves
+augment(rocauc_final_fit, new_data = grades_test2_fctr_nocourse) %>%
+  roc_curve(truth = g3, estimate = .pred_Fail) %>%
+  autoplot()
+
+# confusion matrix
+augment(rocauc_final_fit, new_data = grades_test2_fctr_nocourse) %>%
+  conf_mat(truth = g3, estimate = .pred_class) %>%
+  autoplot(type = "heatmap")
+```
 
