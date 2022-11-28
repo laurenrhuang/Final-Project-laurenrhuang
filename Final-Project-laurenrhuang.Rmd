@@ -5,6 +5,7 @@ date: "2022-10-14"
 output:
   html_document:
     toc: true
+    code_folding: show
 ---
 
 ```{r setup, include=FALSE}
@@ -17,7 +18,7 @@ A brief introduction to the selected data set: The data contains information reg
 
 ## Reading in the data, cleaning the data
 
-The first step is to install packages for any functions or models we'll need to fit. For the framework of our models, we'll be using tidymodels.
+The first step is to install packages for any functions or models we want to fit. For the framework of our models, we'll be using tidymodels.
 
 ```{r, message = F, warning = F}
 library(tidyverse)
@@ -26,6 +27,7 @@ library(MASS)
 library(discrim)
 library(poissonreg)
 library(corrr)
+library(corrplot)
 library(pROC) # needed for AUC
 library(janitor)
 library(rpart.plot)
@@ -39,28 +41,32 @@ After installing necessary packages, we read in our two datasets for the classes
 
 ```{r}
 # read in the Maths dataset
-Maths <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/Maths.csv",
-                  show_col_types = FALSE)
+Maths <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/data/Maths.csv", show_col_types = FALSE)
+
+# clean variable names
 Maths <- clean_names(Maths)
 Maths %>% head()
 
 # number of observations in Maths
 dim(Maths)
 
-# distribution of G3 grades in Maths
-hist(Maths$g3,
-     breaks=19,
-     xlab = "student final grades (G3) in Maths",
-     ylab = "count")
-
 # read in the Portuguese dataset
-Portuguese <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/Portuguese.csv",
-                       show_col_types = FALSE)
+Portuguese <- read_csv("C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/data/Portuguese.csv", show_col_types = FALSE)
+
+# clean variable names
 Portuguese <- clean_names(Portuguese)
 Portuguese %>% head()
 
 # number of observations in Portuguese
 dim(Portuguese)
+```
+
+```{r}
+# distribution of G3 grades in Maths
+hist(Maths$g3,
+     breaks=19,
+     xlab = "student final grades (G3) in Maths",
+     ylab = "count")
 
 # distribution of G3 grades in Portuguese
 hist(Portuguese$g3,
@@ -69,9 +75,32 @@ hist(Portuguese$g3,
      ylab = "count")
 ```
 
+From the histograms, it looks like most students' G3 grades are concentrated between 5 and 20, with the most common grades being around 10. Maths G3 grades are slightly more centered, while Portuguese G3 grades are slightly right skewed. Interestingly, there are also many students whose Maths G3 grades are 0.
+
+We can also look at make a correlation matrix to see the relationship between variables in both datasets.
+
+```{r}
+# handle non-numeric variables
+Maths_numeric <- Maths %>% select(-school, -sex, -age, -address, -famsize, -pstatus, -mjob, -fjob, -reason, -guardian, -schoolsup, -famsup, -paid, -activities, -nursery, -higher, -internet, -romantic)
+
+# Maths correlation matrix
+Maths_cor = cor(Maths_numeric)
+corrplot(Maths_cor)
+
+
+# handle non-numeric variables
+Portuguese_numeric <- Portuguese %>% select(-school, -sex, -age, -address, -famsize, -pstatus, -mjob, -fjob, -reason, -guardian, -schoolsup, -famsup, -paid, -activities, -nursery, -higher, -internet, -romantic)
+
+# Portuguese correlation matrix
+Portuguese_cor = cor(Portuguese_numeric)
+corrplot(Portuguese_cor)
+```
+
+The first thing that stands out to me among the two matrices is that several of the predictors are more strongly correlated (whether negative or positive) in the Portuguese dataset than the Maths dataset. You can tell by the color and size of the dots, some of the dots in the Portuguese correlation matrix tend to be darker in color and larger in size. One example of this is relationship between G1, G2 grades and failures. Are there any other relationships that stand out to you?
+
 As we mentioned earlier, the goal of using this data will be using our predictor variables (ex. school, sex, age, address, family size, parental status, mother's education, father's education, etc.) to predict a student's G3 (final grade) grade/whether a student will pass the class. As we look through the variables, we see that G1 and G2 grades are included. This is great because they will help us in predicting G3 grades.
 
-Let's add a variable called "course" so we know which observations are from which dataset. This is important because later we will be merging and/or splitting the dataset, so we want to keep track.
+Let's add a variable called "course" so we know which observations are from which dataset. This is important later when we merge and split the dataset, we will want to keep track.
 
 ```{r}
 # add course = "Maths" as a predictor to label the dataset
@@ -86,7 +115,6 @@ Portuguese_new <- cbind(Portuguese, course)
 Portuguese_new <- clean_names(Portuguese_new)
 Portuguese_new %>% head()
 ```
-
 
 ## Exploratory Data Analysis
 
@@ -146,7 +174,6 @@ grades_test2_nocourse <- grades_test2 %>%
   select(-course)
 ```
 
-
 ## Should we choose Regression or Classification?
 
 The next tricky question we have is to use regression or classification methods. Technically G3 grades are discrete, for example a student can get a grade of 0, 1, 4, 5, but nothing like 1.5 or 4.33. However, from our histogram earlier, we saw that some grades are more commonly earned than others. Specifically, many students earn grades of 0, 9 or 10, but there are very few/no students who earn a grade of 4. Because the grades are so disproportionately spread out, this might cause a problem if we use a classification model. There wouldn't be "enough" grades in each level/category for the model to be trained well. Because of this problem, let's try fitting models in both regression and classification.
@@ -160,13 +187,14 @@ We will make 2 recipes, the first one we use when working with Method 1. merged 
 The reason for this is because for Method 2, we split the data into training/testing by course. However, when we fit models and predict, having course=Portuguese for training and course=Math throws an error because the model won't know how to carry over its training knowledge to testing when the two courses are not the same. Therefore we need this 2nd recipe without the course variable, and we need grades_train2_nocourse and grades_test2_nocourse to fit the model.
 
 ```{r}
+# recipe for Method 1. merged dataset
 grades_recipe1 <- recipe(g3 ~ ., data=all_classes2) %>%
   step_dummy(all_nominal_predictors())
 
+# recipe for Method 2. Portuguese for training, Maths for testing
 grades_recipe2 <- recipe(g3 ~ ., data=all_classes) %>%
   step_dummy(all_nominal_predictors())
 ```
-
 
 We'll begin with a linear regression model.
 
@@ -254,78 +282,6 @@ grades_metrics2(grades_train_res2, truth = g3,
 
 From our two linear regression models above, we see that both have values of rmse of greater than 1. This shows that the model didn't perform particularly well, or isn't optimized well. For reference, the closer rmse is to 0, the better our model is. We also have a high mae, which isn't super great because the closer mae is to 0, the better. Between the two, it looks like Method 2. Portuguese for training and Maths for testing gave us better predictions. Let's try some classification methods now, and see if they are better at predicting.
 
-#### k-fold cross validation
-
-```{r, eval = F}
-#grades_folds <- vfold_cv(grades_train, v = 10, strata = G3)
-
-# lm engine
-#lm_model <- linear_reg() %>% 
-#  set_engine("lm")
-# create workflow
-#lm_wflow <- workflow() %>% 
-#  add_model(lm_model) %>% 
-#  add_recipe(grades_recipe1)
-
-#fit_lm_kfold <- fit_resamples(lm_wflow,
-#                        grades_folds,
-#                        control = control_resamples(save_pred = TRUE)
-#                        )
-#collect_metrics(fit_lm_kfold)
-
-#final_fit <- fit(lm_wflow, grades_train)
-
-#grades_predicted <- predict(final_fit, new_data = grades_train)
-#grades_predicted <- bind_cols(grades_predicted, grades_train %>% select(G3))
-#grades_predicted
-
-#grades_predicted_test <- predict(final_fit, new_data = grades_test)
-#grades_predicted_test <- bind_cols(grades_predicted_test, grades_test %>% select(G3))
-#grades_predicted_test
-
-# check average accuracy on test data
-#grades_metrics <- metric_set(rmse, rsq, mae)
-#grades_metrics(grades_predicted, truth = G3, 
-#                estimate = .pred)
-#grades_metrics(grades_predicted_test, truth = G3, 
-#                estimate = .pred)
-```
-
-```{r, eval = F}
-#grades_folds2 <- vfold_cv(grades_train2, v = 10, strata = G3)
-
-# lm engine
-#lm_model <- linear_reg() %>% 
-#  set_engine("lm")
-# create workflow
-#lm_wflow2 <- workflow() %>% 
-#  add_model(lm_model) %>% 
-#  add_recipe(grades_recipe2)
-
-#fit_lm2_kfold <- fit_resamples(lm_wflow2,
-#                        grades_folds2,
-#                        control = control_resamples(save_pred = TRUE)
-#                        )
-#collect_metrics(fit_lm2_kfold)
-
-#final_fit2 <- fit(lm_wflow2, grades_train2)
-
-#grades_predicted2 <- predict(final_fit2, new_data = grades_train2)
-#grades_predicted2 <- bind_cols(grades_predicted2, grades_train2_nocourse %>% select(G3))
-#grades_predicted2
-
-#grades_predicted2_test <- predict(final_fit2, new_data = grades_test2)
-#grades_predicted2_test <- bind_cols(grades_predicted2_test, grades_test2_nocourse %>% select(G3))
-#grades_predicted2_test
-
-# check average accuracy on test data
-#grades_metrics <- metric_set(rmse, rsq, mae)
-#grades_metrics(grades_predicted, truth = G3, 
-#                estimate = .pred)
-#grades_metrics(grades_predicted2, truth = G3, 
-#                estimate = .pred)
-```
-
 
 ### Classification
 
@@ -336,7 +292,7 @@ Instead, (advised by my TA Hanmo) we can group the G3 grades into two levels of 
 Before we fit any models however, we need to convert our outcome variable G3 into a factor and give it the new levels of "Pass" and "Fail." Again, we do this for the dataset that has course labels, and the dataset without course labels. Be sure to check that the new factor levels have been assigned correctly!
 
 ```{r}
-# convert outcome variable to factor first
+# convert outcome variable to factor first!
 
 # Method 1. dataset without course labels
 all_classes_fctr <- all_classes %>% mutate(g3 = factor(g3))
@@ -387,12 +343,14 @@ grades_test2_fctr_nocourse <- grades_test2_fctr %>%
   select(-course)
 ```
 
-Let's make 2 recipes (same as above) for the classification models with the data, except this time our outcome G3 is a factor.
+Let's make 2 recipes (like we did above) for the classification models with the data, except this time our outcome G3 is a factor.
 
 ```{r}
+# recipe for Method 1. merged dataset
 grades_recipe1_fctr <- recipe(g3 ~ ., data=all_classes2_fctr) %>%
   step_dummy(all_nominal_predictors())
 
+# recipe for Method 2. Portuguese for training, Maths for testing
 grades_recipe2_fctr <- recipe(g3 ~ ., data=all_classes_fctr) %>%
   step_dummy(all_nominal_predictors())
 ```
@@ -738,12 +696,12 @@ tune_res_elasticnet <- tune_grid(
 )
 
 # write file
-write_rds(tune_res_elasticnet, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/tune_res_elasticnet.rds")
+write_rds(tune_res_elasticnet, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/tune_res_elasticnet.rds")
 ```
 
 ```{r}
 # read file
-tune_res_elasticnet <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131//Final-Project/Final-Project-laurenrhuang/tune_res_elasticnet.rds")
+tune_res_elasticnet <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131//Final-Project/Final-Project-laurenrhuang/saved_models/tune_res_elasticnet.rds")
 
 # autoplot
 autoplot(tune_res_elasticnet)
@@ -793,12 +751,12 @@ tune_res_elasticnet2 <- tune_grid(
 )
 
 # write file
-write_rds(tune_res_elasticnet2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/tune_res_elasticnet2.rds")
+write_rds(tune_res_elasticnet2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/tune_res_elasticnet2.rds")
 ```
 
 ```{r}
 # read file
-tune_res_elasticnet2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/tune_res_elasticnet2.rds")
+tune_res_elasticnet2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/tune_res_elasticnet2.rds")
 
 # autoplot
 autoplot(tune_res_elasticnet2)
@@ -821,8 +779,7 @@ augment(elasticnet2_final_fit, new_data = grades_test2_fctr_nocourse) %>%
   accuracy(truth = g3, estimate = .pred_class)
 ```
 
-
-As we saw above, it seems like Method 1. merged dataset gave us better accuracy when fitted to the elastic net model. Let's investigate the details of this model by calculating AUC, roc_auc, and plotting ROC curves. We also make a heatmap confusion matrix.
+From the results above, it seems like Method 1. merged dataset gives us better accuracy when fitted to the elastic net model. Let's investigate the details of this model by calculating AUC, roc_auc, and plotting ROC curves. We can also make a heatmap of the confusion matrix.
 
 ```{r, warning = F, message = F}
 # convert predicted values
@@ -852,9 +809,31 @@ predicted_data <- augment(elasticnet1_final_fit, new_data = grades_test_fctr) %>
 predicted_data %>% roc_auc(g3, .pred_Fail)
 ```
 
+Our results match up, yay! our ROC AUC is 0.9799, which follows the ROC curve we plotted. This can also be verified with the results from the confusion matrix. Lastly, our metrics tell us that the elastic net model accuracy on the testing dataset is 0.9299363.
+
 ### Decision Tree
 
+Next, we move to the tree models. A decision tree model is just one type of tree model. You can think of a decision tree as a branching method that looks at every possible output for a specific input. Take a look at the visualization in the next code chunk.
+
 #### Method 1. merged dataset
+
+```{r, warning = F}
+# decision tree engine
+tree_spec <- decision_tree() %>%
+  set_engine("rpart")
+class_tree_spec <- tree_spec %>%
+  set_mode("classification")
+
+# fit model
+class_tree_fit <- class_tree_spec %>%
+  fit(g3 ~ ., data = grades_train_fctr)
+
+# visualize
+class_tree_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot()
+```
+Like the previous models, we set an engine for the decision tree model. We also make a grid to tune the cost complexity parameter. Note, the cost complexity parameter is very important because it helps "prune" the tree. This means it reduces the size of the tree and keeps the tree from having "too many branches" or "leaf nodes." A tree that has too many branches or leaf nodes could lead to model overfitting.
 
 ```{r}
 # decision tree engine
@@ -872,7 +851,9 @@ set.seed(3435)
 param_grid <- grid_regular(cost_complexity(range = c(-3, -1)), levels = 10)
 ```
 
-```{r}
+We fit the model with tune_grid, but it can take a long time to run, so it would be wise to save our fitted model to a file. This way, we don't have to refit the model every time we run the code.
+
+```{r, eval = F}
 # fit with tune_grid
 classtree_tune_res <- tune_grid(
   class_tree_wf, 
@@ -882,12 +863,14 @@ classtree_tune_res <- tune_grid(
 )
 
 # write file
-write_rds(tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/classtree_tune_res.rds")
+write_rds(tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/classtree_tune_res.rds")
 ```
+
+Read the file, and plot a comparison of the cost-complexity parameter to accuracy. What do you notice? It looks like accuracy peaks and flattens at about 0.92 once we reach a cost complexity of about 0.02.
 
 ```{r}
 # read file
-classtree_tune_res <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/classtree_tune_res.rds")
+classtree_tune_res <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/classtree_tune_res.rds")
 
 # cost-complexity accuracy autoplot
 autoplot(classtree_tune_res)
@@ -906,13 +889,35 @@ classtree_final1 <- finalize_workflow(class_tree_wf, classtree_best_complexity)
 classtree_final1_fit <- fit(classtree_final1, data = grades_train_fctr)
 
 # roc_auc
-predicted_data <- augment(classtree_final1_fit, new_data = grades_train_fctr) %>%
+classtree_predicted_data <- augment(classtree_final1_fit, new_data = grades_train_fctr) %>%
   select(g3, starts_with(".pred"))
-predicted_data %>% roc_auc(g3, .pred_Fail)
+classtree_predicted_data %>% roc_auc(g3, .pred_Fail)
 ```
+
+Showing the metrics will give us the specific numbers of cost complexity parameters. From this, we can choose the one that gives us the best accuracy. In this case, the best accuracy is 0.9014038. Using the corresponding best cost complexity parameter gives us an ROC AUC of 0.9048427.
 
 
 #### Method 2. Portuguese for training, Maths for testing
+
+We can do the same for Method 2 of data splitting.
+
+```{r, warning = F}
+# decision tree engine
+tree_spec <- decision_tree() %>%
+  set_engine("rpart")
+class_tree_spec <- tree_spec %>%
+  set_mode("classification")
+
+# fit model
+class_tree_fit2 <- class_tree_spec %>%
+  fit(g3 ~ ., data = grades_train2_fctr)
+
+# visualize
+class_tree_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot()
+```
+
 
 ```{r}
 # decision tree engine
@@ -926,7 +931,7 @@ class_tree_wf2 <- workflow() %>%
   add_recipe(grades_recipe2_fctr_new)
 ```
 
-```{r}
+```{r, eval = F}
 # fit with tune_grid
 classtree_tune_res2 <- tune_grid(
   class_tree_wf2, 
@@ -935,12 +940,12 @@ classtree_tune_res2 <- tune_grid(
   metrics = metric_set(accuracy)
 )
 # write file
-write_rds(classtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/classtree_tune_res2.rds")
+write_rds(classtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/classtree_tune_res2.rds")
 ```
 
 ```{r}
 # read file
-classtree_tune_res2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/classtree_tune_res2.rds")
+classtree_tune_res2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/classtree_tune_res2.rds")
 # cost-complexity accuracy autoplot
 autoplot(classtree_tune_res2)
 ```
@@ -958,18 +963,20 @@ classtree_final2 <- finalize_workflow(class_tree_wf2, classtree_best_complexity2
 classtree_final_fit2 <- fit(classtree_final2, data = grades_train2_fctr_nocourse)
 
 # roc_auc
-predicted_data <- augment(classtree_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
+classtree_predicted_data2 <- augment(classtree_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
   select(g3, starts_with(".pred"))
-predicted_data %>% roc_auc(g3, .pred_Fail)
+classtree_predicted_data2 %>% roc_auc(g3, .pred_Fail)
 ```
 
-
+Showing the metrics will give us the specific numbers of cost complexity parameters. We again can choose the one that gives us the best accuracy. Here, the best accuracy is 0.9029647. Using the corresponding best cost complexity parameter gives us an ROC AUC of 0.9338024.
 
 ### Boosted Tree
 
+Next, let's try a boosted tree model to see if it gives us better results than the decision tree model. A boosted tree is like a decision tree, but boosting means that each tree is dependent on prior trees. The algorithm learns by fitting the residual of the trees that preceded it. Boosting uses a group of decision tree models.
+
 #### Method 1. merged dataset
 
-*FIXME CHECK ROC AUC*
+First, specify the boosted tree engine and create a grid to tune the number of trees.
 
 ```{r}
 # set boosted tree engine
@@ -987,7 +994,9 @@ param_grid2 <- grid_regular(trees(range = c(10, 2000)),
                             levels = 10)
 ```
 
-```{r}
+Fit using tune_grid, and write to file.
+
+```{r, eval = F}
 # fit using tune_grid
 boostedtree_tune_res <- tune_grid(
   xgb_wf, 
@@ -996,12 +1005,14 @@ boostedtree_tune_res <- tune_grid(
   metrics = metric_set(accuracy)
 )
 # write file
-write_rds(boostedtree_tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/boostedtree_tune_res.rds")
+write_rds(boostedtree_tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res.rds")
 ```
+
+Let's read the file and plot the accuracies. It looks like accuracy peaks at 0.8972186 around 1115 trees. 
 
 ```{r}
 # read file
-boostedtree_tune_res <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/boostedtree_tune_res.rds")
+boostedtree_tune_res <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res.rds")
 
 # autoplot
 autoplot(boostedtree_tune_res)
@@ -1016,17 +1027,18 @@ boostedtree_best_complexity
 # fit
 xgb_final1 <- finalize_workflow(xgb_wf, boostedtree_best_complexity)
 xgb_final_fit1 <- fit(xgb_final1, data = grades_train_fctr)
-predicted_data2 <- augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
-  select(g3, starts_with(".pred"))
 
 # roc_auc
-predicted_data2 %>% roc_auc(g3, .pred_Fail)
+xgb_predicted_data <- augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
+  select(g3, starts_with(".pred"))
+xgb_predicted_data %>% roc_auc(g3, .pred_Fail)
 ```
 
+The highest accuracy we get is 0.8972186, but we get an ROC AUC of 1. Why do you think this is?
 
 #### Method 2. Portuguese for training, Maths for testing
 
-*FIXME CHECK ROC AUC*
+Here we'll do the same, except using Method 2 of data splitting. 
 
 ```{r}
 # set boosted tree engine
@@ -1044,7 +1056,7 @@ param_grid2 <- grid_regular(trees(range = c(10, 2000)),
                             levels = 10)
 ```
 
-```{r}
+```{r, eval = F}
 # fit using tune_grid
 boostedtree_tune_res2 <- tune_grid(
   xgb_wf2, 
@@ -1053,12 +1065,14 @@ boostedtree_tune_res2 <- tune_grid(
   metrics = metric_set(accuracy)
 )
 # write file
-write_rds(boostedtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/boostedtree_tune_res2.rds")
+write_rds(boostedtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res2.rds")
 ```
+
+Read the file and plot the accuracies. This time it looks like accuracy peaks at 0.8981952 with about 231 trees.
 
 ```{r}
 # read file
-boostedtree_tune_res2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/boostedtree_tune_res2.rds")
+boostedtree_tune_res2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res2.rds")
 
 # autoplot
 autoplot(boostedtree_tune_res2)
@@ -1073,12 +1087,16 @@ boostedtree_best_complexity2
 # fit
 xgb_final2 <- finalize_workflow(xgb_wf2, boostedtree_best_complexity2)
 xgb_final_fit2 <- fit(xgb_final2, data = grades_train2_fctr_nocourse)
-predicted_data2 <- augment(xgb_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
-  select(g3, starts_with(".pred"))
 
 # roc_auc
-predicted_data2 %>% roc_auc(g3, .pred_Fail)
+xgb_predicted_data2 <- augment(xgb_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
+  select(g3, starts_with(".pred"))
+xgb_predicted_data2 %>% roc_auc(g3, .pred_Fail)
 ```
+
+Again, we have a lower accuracy of 0.8981952 compared to the decision tree models, and the ROC AUC is 1 again. Let's try fitting the boosted tree model to our testing data and see how it performs.
+
+In review, after analyzing both of our boosted tree models, Method 2 of data splitting gave us a slightly higher accuracy of 0.8981952. Let us now fit the testing data to our Method 2 model. We can observe the results by making a ROC curve and heatmap of the confusion matrix to see if the results line up with our ROC AUC value.
 
 ```{r}
 # select the best (boosted tree)
@@ -1087,10 +1105,10 @@ best_rocauc <- select_best(boostedtree_tune_res2)
 # fit
 rocauc_final <- finalize_workflow(xgb_wf2, boostedtree_best_complexity2)
 rocauc_final_fit <- fit(rocauc_final, data = grades_train2_fctr_nocourse)
-predicted_data_final <- augment(xgb_final_fit2, new_data = grades_test2_fctr_nocourse) %>%
-  select(g3, starts_with(".pred"))
 
 # roc_auc
+predicted_data_final <- augment(xgb_final_fit2, new_data = grades_test2_fctr_nocourse) %>%
+  select(g3, starts_with(".pred"))
 predicted_data_final %>% roc_auc(g3, .pred_Fail)
 
 # roc curves
