@@ -21,6 +21,7 @@ A brief introduction to the selected data set: The data contains information reg
 The first step is to install packages for any functions or models we want to fit. For the framework of our models, we'll be using tidymodels.
 
 ```{r, message = F, warning = F}
+# load packages
 library(tidyverse)
 library(tidymodels)
 library(MASS)
@@ -28,7 +29,7 @@ library(discrim)
 library(poissonreg)
 library(corrr)
 library(corrplot)
-library(pROC) # needed for AUC
+library(pROC)
 library(janitor)
 library(rpart.plot)
 library(vip)
@@ -319,6 +320,8 @@ all_classes2_fctr$g3 %>% head()
 We take our datasets with the new factor outcome variable and split it with two different ways, just like we did above. (1. large merged dataset, 2. Portuguese=training, Maths=testing)
 
 ```{r}
+set.seed(3435)
+
 # Method 1. merged dataset
 # split data into training/testing
 grades_split_fctr <- initial_split(all_classes2_fctr, prop = 0.7,
@@ -348,11 +351,15 @@ Let's make 2 recipes (like we did above) for the classification models with the 
 ```{r}
 # recipe for Method 1. merged dataset
 grades_recipe1_fctr <- recipe(g3 ~ ., data=all_classes2_fctr) %>%
-  step_dummy(all_nominal_predictors())
+  step_dummy(all_nominal_predictors()) %>%
+  step_center(all_predictors()) %>% # center predictors
+  step_scale(all_predictors()) # scale predictors
 
 # recipe for Method 2. Portuguese for training, Maths for testing
 grades_recipe2_fctr <- recipe(g3 ~ ., data=all_classes_fctr) %>%
-  step_dummy(all_nominal_predictors())
+  step_dummy(all_nominal_predictors()) %>%
+  step_center(all_predictors()) %>% # center predictors
+  step_scale(all_predictors()) # scale predictors
 ```
 
 For the classification models, let's begin with logistic regression. Then we'll try linear discriminant analysis (LDA) and quadratic discriminant analysis (QDA).
@@ -543,6 +550,8 @@ We can try k-fold cross validation on the model that performed best out of class
 #### Method 1. merged dataset
 
 ```{r, message = F, warning = F}
+set.seed(3435)
+
 # 10-fold cross validation
 grades_folds_fctr <- vfold_cv(grades_train_fctr, v = 10)
 
@@ -582,9 +591,13 @@ log_acc_kfold <- augment(final_fit, new_data = grades_test_fctr) %>%
 log_acc_kfold
 ```
 
+A quick definition here, AUC is the "area under the curve." ROC and AUC represent the model's capability of distinguishing between classes. In our scenario, AUC is measuring how capable each model is at distinguishing students who "Fail" from students who "Pass."
+
 #### Method 2. Portuguese for training, Maths for testing
 
 ```{r, message = F, warning = F}
+set.seed(3435)
+
 # 10-fold cross validation
 grades_folds2_fctr <- vfold_cv(grades_train2_fctr, v = 10)
 
@@ -627,50 +640,38 @@ log_acc2_kfold
 By comparing the testing accuracy, it looks like the model that used Method 1. merged dataset actually gave higher accuracy than Method 2. Portuguese for training, Maths for testing. The accuracy from Method 1. is 0.9235669, the accuracy from Method 2. is 0.8936709. The difference between the two accuracies is only about 0.03. This is opposite of what we saw when we used the training data. Let's plot their respective ROC curves to see if the visual results are consistent.
 
 ```{r, message = F, warning = F}
-# ROC curves
-# Method 1. merged dataset
+# ROC curve Method 1. merged dataset
 augment(final_fit, new_data = grades_test_fctr) %>%
   roc_curve(truth = grades_test_fctr$g3, estimate = .pred_Fail) %>%
   autoplot()
-
 # calculate AUC
 pred_Fail <- as.data.frame(predict(final_fit, new_data = grades_test_fctr, type = "prob"))[,1]
 auc(grades_test_fctr$g3, pred_Fail)
 
-# Method 2. Portuguese for training, Maths for testing
+# ROC curve Method 2. Portuguese for training, Maths for testing
 augment(final_fit2, new_data = grades_test2_fctr) %>%
   roc_curve(truth = grades_test2_fctr$g3, estimate = .pred_Fail) %>%
   autoplot()
-
 # calculate AUC
 pred_Fail2 <- as.data.frame(predict(final_fit2, new_data = grades_test2_fctr, type = "prob"))[,1]
 auc(grades_test2_fctr$g3, pred_Fail2)
 ```
 
+This is an example of an ROC curve. For reference, this website's definition says "A ROC curve is constructed by plotting the true positive rate (TPR) against the false positive rate (FPR)." https://www.displayr.com/what-is-a-roc-curve-how-to-interpret-it/
+Basically, an ROC curve measures a model's performance at classifying the data into the correct categories (ex. "Fail", "Pass")
+
 As expected, the ROC curves of the accuracies from the two different methods are extremely similar, with slight variation at the middle of the curve. If we calculate the AUC (area under the curve) for the two methods, we see that the AUC for Method 1 is 0.9766 which is slightly bigger than the AUC for method 2, 0.9712. This is consistent with our results from the accuracy metrics above.
 
 ### Elastic Net Tuning
 
-Next, let's try the elastic net method, where we tune the parameters of mixture and penalty. This is an a model that uses an "in between" penalty term in comparison to ridge and lasso regression (where the penalty terms are 0 and as close to infinity as possible, respectively). Note, we use multinomial regression, which is generally used to predict an outcome with several factor levels. Before we fit the models, we first update our recipes from earlier by centering and scaling our predictors.
-
-```{r}
-# update recipes by centering and scaling predictors 
-grades_recipe1_fctr_new <- recipe(g3 ~ ., data=all_classes2_fctr) %>%
-  step_dummy(all_nominal_predictors()) %>%
-  step_center(all_predictors()) %>% # center predictors
-  step_scale(all_predictors()) # scale predictors
-
-grades_recipe2_fctr_new <- recipe(g3 ~ ., data=all_classes_fctr) %>%
-  step_dummy(all_nominal_predictors()) %>%
-  step_center(all_predictors()) %>% # center predictors
-  step_scale(all_predictors()) # scale predictors
-```
-
-Again, we fit the elastic net model to both our method 1. merged dataset and method 2. Portugese=training, Maths=testing data to see which gives us better results.
+Next, let's try the elastic net method, where we tune the parameters of mixture and penalty. This is an a model that uses an "in between" penalty term in comparison to ridge and lasso regression (where the penalty terms are 0 and as close to infinity as possible, respectively). Note, we use multinomial regression, which is generally used to predict an outcome with several factor levels.
+Again, we fit the elastic net model to both our method 1. merged dataset and method 2. Portugese = training, Maths = testing data to see which gives us better results.
 
 #### Method 1. merged dataset
 
 ```{r}
+set.seed(3435)
+
 # 5-fold cross validation
 grades_folds_fctr_new <- vfold_cv(grades_train_fctr, v = 5, strata = g3)
 
@@ -682,7 +683,7 @@ multinom_reg_model <- multinom_reg(mixture = tune(), penalty = tune()) %>%
 # create workflow
 multinom_reg_wf <- workflow() %>%
   add_model(multinom_reg_model) %>% # add model
-  add_recipe(grades_recipe1_fctr_new) # add recipe
+  add_recipe(grades_recipe1_fctr) # add recipe
 
 # grid for penalty and mixture
 grid_pm_en <- grid_regular(mixture(range = c(0, 1)), penalty(range = c(-5, 5)), levels = c(mixture = 10, penalty = 10))
@@ -729,6 +730,8 @@ We do the same for Method 2. Portuguese = training, Maths = testing
 #### Method 2. Portuguese for training, Maths for testing
 
 ```{r}
+set.seed(3435)
+
 # 5-fold cross validation
 grades_folds2_fctr_new <- vfold_cv(grades_train2_fctr_nocourse, v = 5, strata = g3)
 
@@ -740,7 +743,7 @@ multinom_reg_model <- multinom_reg(mixture = tune(), penalty = tune()) %>%
 # create workflow
 multinom_reg_wf2 <- workflow() %>%
   add_model(multinom_reg_model) %>% # add model
-  add_recipe(grades_recipe2_fctr_new) # add recipe
+  add_recipe(grades_recipe2_fctr) # add recipe
 ```
 
 ```{r, eval = F}
@@ -813,7 +816,7 @@ Our results match up, yay! our ROC AUC is 0.9799, which follows the ROC curve we
 
 ### Decision Tree
 
-Next, we move to the tree models. A decision tree model is just one type of tree model. You can think of a decision tree as a branching method that looks at every possible output for a specific input. Take a look at the visualization in the next code chunk.
+Next, we move to the tree model family. A decision tree is one type of tree model. You can think of a decision tree as a branching method that looks at every possible output for a specific input. Take a look at the visualization in the next code chunk.
 
 #### Method 1. merged dataset
 
@@ -844,7 +847,7 @@ tree_spec <- decision_tree() %>%
 # create workflow
 class_tree_wf <- workflow() %>%
   add_model(tree_spec %>% set_args(cost_complexity = tune())) %>%
-  add_recipe(grades_recipe1_fctr_new)
+  add_recipe(grades_recipe1_fctr)
 
 # create grid
 set.seed(3435)
@@ -928,7 +931,7 @@ tree_spec <- decision_tree() %>%
 # create workflow
 class_tree_wf2 <- workflow() %>%
   add_model(tree_spec %>% set_args(cost_complexity = tune())) %>%
-  add_recipe(grades_recipe2_fctr_new)
+  add_recipe(grades_recipe2_fctr)
 ```
 
 ```{r, eval = F}
@@ -939,6 +942,7 @@ classtree_tune_res2 <- tune_grid(
   grid = param_grid, 
   metrics = metric_set(accuracy)
 )
+
 # write file
 write_rds(classtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/classtree_tune_res2.rds")
 ```
@@ -946,6 +950,7 @@ write_rds(classtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fa
 ```{r}
 # read file
 classtree_tune_res2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/classtree_tune_res2.rds")
+
 # cost-complexity accuracy autoplot
 autoplot(classtree_tune_res2)
 ```
@@ -972,7 +977,7 @@ Showing the metrics will give us the specific numbers of cost complexity paramet
 
 ### Boosted Tree
 
-Next, let's try a boosted tree model to see if it gives us better results than the decision tree model. A boosted tree is like a decision tree, but boosting means that each tree is dependent on prior trees. The algorithm learns by fitting the residual of the trees that preceded it. Boosting uses a group of decision tree models.
+Next, let's try a boosted tree model to see if it gives us better results than the decision tree model. A boosted tree is like a decision tree, but boosting means that each tree is dependent on prior trees. The algorithm learns by fitting the residual of the trees that preceded it. Boosting uses a group of decision tree models. Technically we could also try a random forest model, which is constructed using multiple decision trees at a time. The difference between random forests and boosted trees is that each tree in random forests are independent, whereas the trees in boosted tree models are dependent. But because random forests and boosted tree models involve multiple decision trees, they usually take a long time to run. For the sake of this project, we'll just try out a boosted tree.
 
 #### Method 1. merged dataset
 
@@ -987,7 +992,7 @@ xgb_spec <- boost_tree() %>%
 # create workflow
 xgb_wf <- workflow() %>%
   add_model(xgb_spec %>% set_args(trees = tune())) %>%
-  add_recipe(grades_recipe1_fctr_new)
+  add_recipe(grades_recipe1_fctr)
 
 # create grid
 param_grid2 <- grid_regular(trees(range = c(10, 2000)),
@@ -1004,6 +1009,7 @@ boostedtree_tune_res <- tune_grid(
   grid = param_grid2, 
   metrics = metric_set(accuracy)
 )
+
 # write file
 write_rds(boostedtree_tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res.rds")
 ```
@@ -1034,7 +1040,7 @@ xgb_predicted_data <- augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
 xgb_predicted_data %>% roc_auc(g3, .pred_Fail)
 ```
 
-The highest accuracy we get is 0.8972186, but we get an ROC AUC of 1. Why do you think this is?
+The highest accuracy we get is 0.8972186, but we get an ROC AUC of 1. Why do you think this is? This may be because the ROC is biased and performs well on one class, but has some false negatives as well.
 
 #### Method 2. Portuguese for training, Maths for testing
 
@@ -1049,7 +1055,7 @@ xgb_spec <- boost_tree() %>%
 # create workflow
 xgb_wf2 <- workflow() %>%
   add_model(xgb_spec %>% set_args(trees = tune())) %>%
-  add_recipe(grades_recipe2_fctr_new)
+  add_recipe(grades_recipe2_fctr)
 
 # create grid
 param_grid2 <- grid_regular(trees(range = c(10, 2000)),
@@ -1064,6 +1070,7 @@ boostedtree_tune_res2 <- tune_grid(
   grid = param_grid2, 
   metrics = metric_set(accuracy)
 )
+
 # write file
 write_rds(boostedtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res2.rds")
 ```
