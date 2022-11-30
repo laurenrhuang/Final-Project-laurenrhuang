@@ -185,7 +185,7 @@ Please note: for each of the models below, I will be fitting one model for each 
 
 We will make 2 recipes, the first one we use when working with Method 1. merged dataset (has course variable) and the second we use when working with Method 2. Portuguese for training, Maths for testing (without course variable). 
 
-The reason for this is because for Method 2, we split the data into training/testing by course. However, when we fit models and predict, having course=Portuguese for training and course=Math throws an error because the model won't know how to carry over its training knowledge to testing when the two courses are not the same. Therefore we need this 2nd recipe without the course variable, and we need grades_train2_nocourse and grades_test2_nocourse to fit the model.
+The reason for this is because for Method 2, we split the data into training/testing by course. However, when we fit models and predict, having course=Portuguese for training and course=Math for testing throws an error because the model won't know how to carry over its training knowledge to testing when the two courses are not the same. Therefore we need this 2nd recipe without the course variable, and we need grades_train2_nocourse and grades_test2_nocourse to fit the model.
 
 ```{r}
 # recipe for Method 1. merged dataset
@@ -200,6 +200,8 @@ grades_recipe2 <- recipe(g3 ~ ., data=all_classes) %>%
 We'll begin with a linear regression model.
 
 #### Linear Regression Model (Method 1. merged dataset)
+
+We begin with Method 1.
 
 ```{r}
 # test out a linear regression model on our merged dataset
@@ -241,6 +243,8 @@ grades_metrics1(grades_train_res, truth = g3,
 ```
 
 #### Linear Regression Model (Method 2. Portuguese for training, Maths for testing)
+
+Now let's do the same for Method 2.
 
 ```{r}
 # test out a linear regression model on our second dataset (using Portuguese for training, Maths for testing)
@@ -424,6 +428,8 @@ log_reg_acc2 <- augment(log_fit2, new_data = grades_train2_fctr) %>%
 log_reg_acc2
 ```
 
+Both data methods gave us accuracies greater than 0.9, that's really good! Will LDA or QDA give us better results?
+
 #### Linear Discriminant Analysis (LDA) Model (Method 1. merged dataset)
 
 ```{r}
@@ -481,6 +487,8 @@ lda_acc2 <- augment(lda_fit2, new_data = grades_train2_fctr) %>%
   accuracy(truth = g3, estimate = .pred_class)
 lda_acc2
 ```
+
+The accuracies from LDA are slightly lower than what we got for logistic regression. If we were to pick one of the two models, we should probably go with logistic regression, because it is very similar to LDA, but less complex in some aspects. But before we choose, let's check QDA too.
 
 #### Quadratic Discriminant Analysis (QDA) Model (Method 1. merged dataset)
 
@@ -540,7 +548,7 @@ qda_acc2 <- augment(qda_fit2, new_data = grades_train2_fctr) %>%
 qda_acc2
 ```
 
-From the three kinds of models, it seems like logistic regression performed the best, giving us the highest accuracy of 0.9322034. We also notice that for logistic regression and QDA, Method 2 (Portuguese=training, Maths=testing) of data splitting gave higher accuracy. But for QDA, Method 1 (merged dataset) of data splitting gave a higher accuracy.
+From the three different models, like logistic regression, specifically Method 2, giving us the highest accuracy of 0.9322034. We also notice that for logistic regression and QDA, Method 2 (Portuguese=training, Maths=testing) of data splitting gave higher accuracy. But for QDA, Method 1 (merged dataset) of data splitting gave a higher accuracy.
 
 
 ### k-fold cross validation
@@ -591,7 +599,7 @@ log_acc_kfold <- augment(final_fit, new_data = grades_test_fctr) %>%
 log_acc_kfold
 ```
 
-A quick definition here, AUC is the "area under the curve." ROC and AUC represent the model's capability of distinguishing between classes. In our scenario, AUC is measuring how capable each model is at distinguishing students who "Fail" from students who "Pass."
+A quick definition here, AUC is the "area under the curve." We'll see what this "curve" is referring to the code blocks below. ROC and AUC represent the model's capability of distinguishing between classes. In our scenario, AUC is measuring how capable each model is at distinguishing students who "Fail" from students who "Pass."
 
 #### Method 2. Portuguese for training, Maths for testing
 
@@ -637,10 +645,10 @@ log_acc2_kfold <- augment(final_fit2, new_data = grades_test2_fctr) %>%
 log_acc2_kfold
 ```
 
-By comparing the testing accuracy, it looks like the model that used Method 1. merged dataset actually gave higher accuracy than Method 2. Portuguese for training, Maths for testing. The accuracy from Method 1. is 0.9235669, the accuracy from Method 2. is 0.8936709. The difference between the two accuracies is only about 0.03. This is opposite of what we saw when we used the training data. Let's plot their respective ROC curves to see if the visual results are consistent.
+By comparing the testing accuracy, the model that used Method 1 actually gave higher accuracy than Method 2. (The accuracy from Method 1 is 0.9235669, the accuracy from Method 2 is 0.8936709) The difference between the two accuracies is only about 0.03. This is opposite of what we saw when we used the training data. Let's plot their respective ROC curves to see if the visual results are consistent.
 
 ```{r, message = F, warning = F}
-# ROC curve Method 1. merged dataset
+# ROC curve Method 1
 augment(final_fit, new_data = grades_test_fctr) %>%
   roc_curve(truth = grades_test_fctr$g3, estimate = .pred_Fail) %>%
   autoplot()
@@ -648,7 +656,7 @@ augment(final_fit, new_data = grades_test_fctr) %>%
 pred_Fail <- as.data.frame(predict(final_fit, new_data = grades_test_fctr, type = "prob"))[,1]
 auc(grades_test_fctr$g3, pred_Fail)
 
-# ROC curve Method 2. Portuguese for training, Maths for testing
+# ROC curve Method 2
 augment(final_fit2, new_data = grades_test2_fctr) %>%
   roc_curve(truth = grades_test2_fctr$g3, estimate = .pred_Fail) %>%
   autoplot()
@@ -664,10 +672,12 @@ As expected, the ROC curves of the accuracies from the two different methods are
 
 ### Elastic Net Tuning
 
-Next, let's try the elastic net method, where we tune the parameters of mixture and penalty. This is an a model that uses an "in between" penalty term in comparison to ridge and lasso regression (where the penalty terms are 0 and as close to infinity as possible, respectively). Note, we use multinomial regression, which is generally used to predict an outcome with several factor levels.
-Again, we fit the elastic net model to both our method 1. merged dataset and method 2. Portugese = training, Maths = testing data to see which gives us better results.
+Next, let's try the elastic net method, where we tune the parameters of mixture and penalty. This is an a model that uses an "in between" penalty term in comparison to ridge and lasso regression (where the penalty terms are 0 and as close to infinity as possible, respectively).
+Again, we fit the elastic net model to both Method 1 and Method 2 data to see which gives us better results.
 
 #### Method 1. merged dataset
+
+First we prepare our data by splitting into 5-folds for cross validation. Then we set the engine and create a workflow for multinomial regression (which is used for the elastic net method). Like we mentioned before, we want to tune the mixture and penalty parameters to see which values give us the best results.
 
 ```{r}
 set.seed(3435)
@@ -700,6 +710,8 @@ tune_res_elasticnet <- tune_grid(
 write_rds(tune_res_elasticnet, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/tune_res_elasticnet.rds")
 ```
 
+Models like these which have tuned parameters and involve k-fold cross validation can take longer to run, a good idea would be to save your fitted model to a file so you don't have to re-fit the model every time you run the code!
+
 ```{r}
 # read file
 tune_res_elasticnet <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131//Final-Project/Final-Project-laurenrhuang/saved_models/tune_res_elasticnet.rds")
@@ -707,6 +719,8 @@ tune_res_elasticnet <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/F
 # autoplot
 autoplot(tune_res_elasticnet)
 ```
+
+We can look at all the different combinations of mixture and penalty parameters, and select the one that gives us the best accuracy from the training data. Then, we fit it to the testing data.
 
 ```{r}
 # show the best models according to roc_auc
@@ -725,9 +739,9 @@ augment(elasticnet1_final_fit, new_data = grades_test_fctr) %>%
   accuracy(truth = g3, estimate = .pred_class)
 ```
 
-We do the same for Method 2. Portuguese = training, Maths = testing
-
 #### Method 2. Portuguese for training, Maths for testing
+
+We follow the same steps for Method 2.
 
 ```{r}
 set.seed(3435)
@@ -782,7 +796,7 @@ augment(elasticnet2_final_fit, new_data = grades_test2_fctr_nocourse) %>%
   accuracy(truth = g3, estimate = .pred_class)
 ```
 
-From the results above, it seems like Method 1. merged dataset gives us better accuracy when fitted to the elastic net model. Let's investigate the details of this model by calculating AUC, roc_auc, and plotting ROC curves. We can also make a heatmap of the confusion matrix.
+From the results above, it seems like Method 1 gives us better accuracy when fitted to the elastic net model. Let's investigate the details of this model by calculating AUC, roc_auc, and plotting ROC curves. We can also make a heatmap of the confusion matrix.
 
 ```{r, warning = F, message = F}
 # convert predicted values
@@ -812,7 +826,7 @@ predicted_data <- augment(elasticnet1_final_fit, new_data = grades_test_fctr) %>
 predicted_data %>% roc_auc(g3, .pred_Fail)
 ```
 
-Our results match up, yay! our ROC AUC is 0.9799, which follows the ROC curve we plotted. This can also be verified with the results from the confusion matrix. Lastly, our metrics tell us that the elastic net model accuracy on the testing dataset is 0.9299363.
+Our results match up, hooray! Our ROC AUC is 0.9799, which follows the ROC curve we plotted. This can also be verified with the results from the confusion matrix. Lastly, our metrics tell us that the elastic net model accuracy on the testing dataset is 0.9299363. Are there any other models that can give us even better results?
 
 ### Decision Tree
 
@@ -837,6 +851,7 @@ class_tree_fit %>%
   rpart.plot()
 ```
 Like the previous models, we set an engine for the decision tree model. We also make a grid to tune the cost complexity parameter. Note, the cost complexity parameter is very important because it helps "prune" the tree. This means it reduces the size of the tree and keeps the tree from having "too many branches" or "leaf nodes." A tree that has too many branches or leaf nodes could lead to model overfitting.
+Let's set up the engine and workflow for a decision tree. Here, we tune the cost complexity parameter, to see which value gives us the best results.
 
 ```{r}
 # decision tree engine
@@ -854,7 +869,7 @@ set.seed(3435)
 param_grid <- grid_regular(cost_complexity(range = c(-3, -1)), levels = 10)
 ```
 
-We fit the model with tune_grid, but it can take a long time to run, so it would be wise to save our fitted model to a file. This way, we don't have to refit the model every time we run the code.
+Again, this model can take a long time to run, so we save it to a file.
 
 ```{r, eval = F}
 # fit with tune_grid
@@ -869,7 +884,7 @@ classtree_tune_res <- tune_grid(
 write_rds(tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/classtree_tune_res.rds")
 ```
 
-Read the file, and plot a comparison of the cost-complexity parameter to accuracy. What do you notice? It looks like accuracy peaks and flattens at about 0.92 once we reach a cost complexity of about 0.02.
+Next, we plot a comparison of the cost-complexity parameter to accuracy. What do you notice? It looks like accuracy peaks and flattens at about 0.92 once we reach a cost complexity of about 0.02.
 
 ```{r}
 # read file
@@ -878,6 +893,8 @@ classtree_tune_res <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fa
 # cost-complexity accuracy autoplot
 autoplot(classtree_tune_res)
 ```
+
+We can take a closer look at all the values of the cost complexity parameter, and choose the one that gives us the best results. This matches what we see in the plot above, so that's good.
 
 ```{r}
 # show metrics
@@ -897,12 +914,12 @@ classtree_predicted_data <- augment(classtree_final1_fit, new_data = grades_trai
 classtree_predicted_data %>% roc_auc(g3, .pred_Fail)
 ```
 
-Showing the metrics will give us the specific numbers of cost complexity parameters. From this, we can choose the one that gives us the best accuracy. In this case, the best accuracy is 0.9014038. Using the corresponding best cost complexity parameter gives us an ROC AUC of 0.9048427.
+In this case, the best accuracy is 0.9014038. Using the corresponding best cost complexity parameter gives us an ROC AUC of 0.9048427.
 
 
 #### Method 2. Portuguese for training, Maths for testing
 
-We can do the same for Method 2 of data splitting.
+We do the same for Method 2.
 
 ```{r, warning = F}
 # decision tree engine
@@ -920,7 +937,6 @@ class_tree_fit %>%
   extract_fit_engine() %>%
   rpart.plot()
 ```
-
 
 ```{r}
 # decision tree engine
@@ -954,6 +970,8 @@ classtree_tune_res2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/F
 # cost-complexity accuracy autoplot
 autoplot(classtree_tune_res2)
 ```
+Now this plot looks very different from the one we got for Method 1. This time, it seems that the cost-complexity parameter increases, peaks, drops very steeply, increases a bit, then levels out again. Why do you think this is?
+We look at all the values of the cost complexity parameter, and choose the one that gives us the best results. This matches what we see in the plot above.
 
 ```{r}
 # show metrics
@@ -973,15 +991,16 @@ classtree_predicted_data2 <- augment(classtree_final_fit2, new_data = grades_tra
 classtree_predicted_data2 %>% roc_auc(g3, .pred_Fail)
 ```
 
-Showing the metrics will give us the specific numbers of cost complexity parameters. We again can choose the one that gives us the best accuracy. Here, the best accuracy is 0.9029647. Using the corresponding best cost complexity parameter gives us an ROC AUC of 0.9338024.
+Here, the best accuracy is 0.9029647. Using the corresponding best cost complexity parameter gives us an ROC AUC of 0.9338024.
 
 ### Boosted Tree
 
-Next, let's try a boosted tree model to see if it gives us better results than the decision tree model. A boosted tree is like a decision tree, but boosting means that each tree is dependent on prior trees. The algorithm learns by fitting the residual of the trees that preceded it. Boosting uses a group of decision tree models. Technically we could also try a random forest model, which is constructed using multiple decision trees at a time. The difference between random forests and boosted trees is that each tree in random forests are independent, whereas the trees in boosted tree models are dependent. But because random forests and boosted tree models involve multiple decision trees, they usually take a long time to run. For the sake of this project, we'll just try out a boosted tree.
+Will a boosted tree model give us better results than a decision tree? A boosted tree is like a decision tree, but boosting means that each tree is dependent on prior trees. Boosting uses a group of decision tree models, and learns by fitting the residual of the trees before it. 
+Technically we could also try a random forest model, which is also constructed using multiple decision trees. The difference between the two is that each tree in random forests are independent, whereas the trees in boosted tree models are dependent. But because random forests and boosted tree models involve multiple decision trees, they take a long time to run. For the sake of time, we'll just try out a boosted tree.
 
 #### Method 1. merged dataset
 
-First, specify the boosted tree engine and create a grid to tune the number of trees.
+First, specify the boosted tree engine, workflow, and create a grid to tune the number of trees. Tuning will help us find the number of trees that gives us the best results.
 
 ```{r}
 # set boosted tree engine
@@ -999,8 +1018,6 @@ param_grid2 <- grid_regular(trees(range = c(10, 2000)),
                             levels = 10)
 ```
 
-Fit using tune_grid, and write to file.
-
 ```{r, eval = F}
 # fit using tune_grid
 boostedtree_tune_res <- tune_grid(
@@ -1014,7 +1031,7 @@ boostedtree_tune_res <- tune_grid(
 write_rds(boostedtree_tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res.rds")
 ```
 
-Let's read the file and plot the accuracies. It looks like accuracy peaks at 0.8972186 around 1115 trees. 
+Let's plot the accuracies. The plot matches our metrics results, showing us that accuracy peaks at 0.8972186 around 1115 trees. 
 
 ```{r}
 # read file
@@ -1040,11 +1057,11 @@ xgb_predicted_data <- augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
 xgb_predicted_data %>% roc_auc(g3, .pred_Fail)
 ```
 
-The highest accuracy we get is 0.8972186, but we get an ROC AUC of 1. Why do you think this is? This may be because the ROC is biased and performs well on one class, but has some false negatives as well.
+The highest accuracy we get is 0.8972186, but we get an ROC AUC of 1. Why do you think this is? It may be because the model is biased, performing well on one class, but has some false negatives as well.
 
 #### Method 2. Portuguese for training, Maths for testing
 
-Here we'll do the same, except using Method 2 of data splitting. 
+Here we'll do the same for Method 2. 
 
 ```{r}
 # set boosted tree engine
@@ -1075,7 +1092,7 @@ boostedtree_tune_res2 <- tune_grid(
 write_rds(boostedtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res2.rds")
 ```
 
-Read the file and plot the accuracies. This time it looks like accuracy peaks at 0.8981952 with about 231 trees.
+This time it looks like accuracy peaks at 0.8981952 with about 231 trees, which is consistent with our plot.
 
 ```{r}
 # read file
@@ -1101,7 +1118,7 @@ xgb_predicted_data2 <- augment(xgb_final_fit2, new_data = grades_train2_fctr_noc
 xgb_predicted_data2 %>% roc_auc(g3, .pred_Fail)
 ```
 
-Again, we have a lower accuracy of 0.8981952 compared to the decision tree models, and the ROC AUC is 1 again. Let's try fitting the boosted tree model to our testing data and see how it performs.
+Again, we have a lower accuracy of 0.8981952 compared to the decision tree models, and the ROC AUC is 1 again. Let us fit the boosted tree model to our testing data and see how it performs.
 
 In review, after analyzing both of our boosted tree models, Method 2 of data splitting gave us a slightly higher accuracy of 0.8981952. Let us now fit the testing data to our Method 2 model. We can observe the results by making a ROC curve and heatmap of the confusion matrix to see if the results line up with our ROC AUC value.
 
@@ -1129,3 +1146,8 @@ augment(rocauc_final_fit, new_data = grades_test2_fctr_nocourse) %>%
   autoplot(type = "heatmap")
 ```
 
+
+## Conclusion
+
+After testing both regression and classification methods, it seems like most of our classification models performed better than the regression models.
+Looking at specifically classification models and overall AUC and accuracy, the Elastic Net model using Method 1. merged dataset performed the best, with a ROC AUC of 0.9799213 and accuracy of 0.9299363 on the testing data.
