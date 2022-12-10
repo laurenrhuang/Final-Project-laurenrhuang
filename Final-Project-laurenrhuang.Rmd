@@ -15,8 +15,80 @@ knitr::opts_chunk$set(echo = TRUE)
 # Predicting students' grades in two Portuguese schools
 
 A brief introduction to the selected data set: The data contains information regarding students' academic achievement in secondary education of two Portuguese schools. There are two datasets. One for Maths class, one for Portuguese class. Both datasets contain the same predictor variables, including but not limited to: school, sex, age, address, family size, parent status, mother's education, father's education, mother's job, father's job, etc. There are also variables called G1, G2 and G3. G1 represents a student's grade during first period, G2 represents a student's grade during second period. G3 represents a student's final grade in the class. Having both G1 and G2 are extremely helpful in predicting G3, which is a student's final grade in a class.
+Link to the data: https://www.kaggle.com/datasets/whenamancodes/student-performance?select=Portuguese.csv
 
-## Reading in and cleaning the data
+
+## Why would this model be useful?
+
+The goal of this model is to try and predict a student's final G3 grade based on previous grades, familial relationships, and environmental factors. Hopefully having these results will give educators, staff, and family an idea of where to target resources to support students. For students, a grade prediction would give them a better idea of their current performance.
+
+## Loading data and packages
+
+The codebook is also available as its own file, but it's good to know the variables we will be using in this project:
+
+* `school`: student's school name (GP="Gabriel Pereira", MS="Mousinho da Silveira")
+
+* `sex`: sex (1 if F="Female", 0 if M="Male")
+
+* `age`: age in years
+
+* `famsize`: greater than 3 (GT3) or less than or equal to 3 (LE3)
+
+* `Pstatus`: parent's cohabitiation status (T="living together", A="apart")
+
+* `Medu`: mother's education (0="none", 1="primary", 2="5th to 9th grade", 3="secondary", 4="high edu")
+
+* `Fedu`: father's education (0="none", 1="primary", 2="5th to 9th grade", 3="secondary", 4="high edu")
+
+* `Mjob`: mother's job
+
+* `Fjob`: father's job
+
+* `reason`: reason to choose this school (close to 'home', school 'reputation', 'course' preference or 'other')
+
+* `guardian`: student's guardian (mother, father, other)
+
+* `traveltime`: home to school travel time (1="<15 min.", 2="15 to 30 min.", 3="30 min. to 1 hour", or 4=">1 hour")
+
+* `studytime`: weekly study time (1="<2 hours", 2="2 to 5 hours", 3="5 to 10 hours", or 4=">10 hours")
+
+* `failures`: number of past class failures (n if 1<=n<3, else 0)
+
+* `schoolsup`: extra educational support (yes, no)
+
+* `famsup`: family educational support (yes, no)
+
+* `paid`: extra paid classes within the course subject (yes, no)
+
+* `activities`: extracurricular activities (yes, no)
+
+* `nursery`: attended nursery school (yes, no)
+
+* `higher`: wants to take higher education (yes, no)
+
+* `internet`: internet access at home (yes, no)
+
+* `romantic`: with a romantic relationship (yes, no)
+
+* `famrel`: quality of family relationships (from 1="very bad" to 5="excellent")
+
+* `freetime`: free time after school (1="very low to 5="very high")
+
+* `goout`: going out with friends (1="very low to 5="very high")
+
+* `Dalc`: workday alcohol consumption (1="very low to 5="very high")
+
+* `Walc`: weekend alcohol consumption (1="very low to 5="very high")
+
+* `health`: current health status (from 1="very bad" to 5="very good")
+
+* `absences`: number of school absences
+
+* `G1`: first period grade (0 to 20)
+
+* `G2`: second period grade (0 to 20)
+
+* `G3`: final grade (0 to 20, heavily depends on G1 and G2) (this is what we'll be predicting!)
 
 The first step is to install packages for the functions or models we want to fit. For the framework of our models, we'll be using tidymodels.
 
@@ -38,7 +110,9 @@ library(xgboost)
 tidymodels_prefer()
 ```
 
-After installing necessary packages, we read in our two datasets for the classes "Maths" and "Portuguese."
+## Reading in and cleaning the data
+
+After installing necessary packages, we read in our two datasets for the classes "Maths" and "Portuguese." We are fortunate enough to have datasets with no missing values! Each row/observation represents one student.
 
 ```{r}
 # read in the Maths dataset
@@ -64,27 +138,23 @@ dim(Portuguese)
 
 ## Exploratory Data Analysis
 
-Before we do any analysis, we should get to know our data better first. Let's take a look at the variables, the number of observations in each dataset, and make histograms for each of the datasets to see how G3 student grades are distributed.
+Before we do any analysis, we should get to know our data better first. Let's begin by looking at the variables, the number of observations in each dataset, and making histograms for each of the datasets to see how G3 student grades are distributed.
 
 ### Histogram of the Data
 
 ```{r}
-# distribution of G3 grades in Maths
-hist(Maths$g3,
-     breaks=19,
-     xlab = "student final grades (G3) in Maths",
-     ylab = "count",
-     col = "light blue")
+# histogram of G3 grades in Maths
+ggplot(Maths, aes(g3)) +
+  geom_histogram(bins = 20, fill = "light blue", color = "black") +
+  labs(title = "student final grades in Maths (G3)")
 
-# distribution of G3 grades in Portuguese
-hist(Portuguese$g3,
-     breaks=19,
-     xlab = "student final grades (G3) in Portuguese",
-     ylab = "count",
-     col = "orange")
+# histogram of G3 grades in Portuguese
+ggplot(Portuguese, aes(g3)) +
+  geom_histogram(bins = 20, fill = "orange", color = "black") +
+  labs(title = "student final grades in Portuguese (G3)")
 ```
 
-From the histograms, it looks like most students' G3 grades are concentrated between 5 and 20, with the most common grades being around 10. Maths G3 grades are slightly more centered, while Portuguese G3 grades are slightly right skewed. Interestingly, there are also many students whose Maths G3 grades are 0.
+It looks like most students' G3 grades are concentrated between 5 and 20, with the most common grades being around 10. Maths G3 grades are slightly more centered, while Portuguese G3 grades are slightly right skewed. Interestingly, there are also many students whose Maths G3 grades are 0.
 
 ### Correlation Matrix of the Variables
 
@@ -107,11 +177,59 @@ Portuguese_cor = cor(Portuguese_numeric)
 corrplot(Portuguese_cor)
 ```
 
-The first thing that stands out to me among the two matrices is that several of the predictors are more strongly correlated (whether negative or positive) in the Portuguese dataset than the Maths dataset. You can tell by the color and size of the dots, some of the dots in the Portuguese correlation matrix tend to be darker in color and larger in size. One example of this is relationship between G1, G2 grades and failures. Are there any other relationships that stand out to you?
+Most predictors are not very strongly correlated with G3 grades. However, when looking back and forth between the two  matrices, the first thing I notice is that several of the predictors are more strongly correlated (both negatively and positively) in the Portuguese dataset than the Maths dataset. You can tell by the color and size of the dots. Some of the dots in the Portuguese correlation matrix tend to be darker in color and larger in size. One example of this is relationship between G1, G2 grades and failures. Are there any other relationships that stand out to you?
+
+Let's get more specific and make some graphs of the variables that are most strongly related with G3. This would be G1, G2 grades and failures. We can start with the Maths dataset.
+
+```{r, fig.width = 15}
+# g1
+ggplot(Maths_numeric, aes(g3)) +
+  geom_histogram(bins = 30, color = "black") +
+  facet_wrap(~g1, scales = "free_y") +
+  labs(title = "Histograms of G3 vs. G1 grades")
+
+# g2
+ggplot(Maths_numeric, aes(g3)) +
+  geom_histogram(bins = 30, color = "black") +
+  facet_wrap(~g2, scales = "free_y") +
+  labs(title = "Histograms of G3 vs. G2 grades")
+
+# failures
+ggplot(Maths_numeric, aes(g3)) +
+  geom_histogram(bins = 30, color = "black") +
+  facet_wrap(~failures, scales = "free_y") +
+  labs(title = "Histograms of G3 vs. failures")
+```
+
+It appears that G1 grades are more widely dispersed (the bars are more spread out) than G2 grades. Generally, lower number of failures correlates with higher G3 grades, which makes sense. Something interesting is that the G3 grades of students who have 0 past failures vary much more than students who have 1 or more failures. For instance, the G3 grades of students with 0 past failures range from 0 all the way to 20. Whereas students with 3 past failures did not receive a G3 grade higher than 10. What are some possible reasons for this?
+
+How will the histograms for the Portuguese dataset compare? Let's check it out.
+
+```{r, fig.width = 15}
+# g1
+ggplot(Portuguese_numeric, aes(g3)) +
+  geom_histogram(bins = 30, color = "black") +
+  facet_wrap(~g1, scales = "free_y") +
+  labs(title = "Histograms of G3 vs. G1 grades")
+
+# g2
+ggplot(Portuguese_numeric, aes(g3)) +
+  geom_histogram(bins = 30, color = "black") +
+  facet_wrap(~g2, scales = "free_y") +
+  labs(title = "Histograms of G3 vs. G2 grades")
+
+# failures
+ggplot(Portuguese_numeric, aes(g3)) +
+  geom_histogram(bins = 30, color = "black") +
+  facet_wrap(~failures, scales = "free_y") +
+  labs(title = "Histograms of G3 vs. failures")
+```
+
+Paying close attention, we'll notice that same trend of how G1 grades are widely dispersed than G2 grades, just like we saw with the Maths dataset. More specifically, it looks like there were no students at all who received a G2 grade of 4, whereas there were G1 grades of 4. Perhaps this is a sign that in the data collected, there are not enough students earning in each "grade category" to be proportional.
 
 As we mentioned earlier, the goal of using this data will be using our predictor variables (ex. school, sex, age, address, family size, parental status, mother's education, father's education, etc.) to predict a student's G3 (final grade) grade/whether a student will pass the class. As we look through the variables, we see that G1 and G2 grades are included. This is great because they will help us in predicting G3 grades.
 
-Let's add a variable called "course" so we know which observations are from which dataset. This is important later when we merge and split the dataset, we will want to keep track.
+Let's add a variable called "course" so we know which observations are from which dataset. This will be important when we merge and split the dataset, we will want to keep track.
 
 ```{r}
 # add course = "Maths" as a predictor to label the dataset
@@ -140,11 +258,11 @@ We can fit the models to both methods of data splitting to see which gives us mo
 For method 1, let's merge both Maths and Portuguese into one large dataset.  Mainly we will be working with the data that is labeled by course. After merging, split the merged dataset into training dataset and testing dataset, stratifying on G3, our outcome variable. Stratifying on G3 helps us keep the proportions of the original dataset when we split into training and testing! (You'll notice I'm also merging the data that doesn't have the course variable because I'll need to use it later on.)
 
 ```{r}
-# merge dataset (without labels) into one large dataset 
+# merge non-labeled datasets into one large dataset 
 all_classes <- rbind(Maths, Portuguese) # for train/test use later on in the project
 all_classes %>% head()
 
-# merge course labeled Maths and Portuguese datasets into one large dataset
+# merge course labeled datasets into one large dataset
 all_classes2 <- rbind(Maths_new, Portuguese_new)
 all_classes2 %>% head()
 
@@ -186,15 +304,15 @@ grades_test2_nocourse <- grades_test2 %>%
 
 ## Should we choose Regression or Classification?
 
-The next tricky question we have is to use regression or classification methods. Technically G3 grades are discrete, for example a student can get a grade of 0, 1, 4, 5, but nothing like 1.5 or 4.33. However, from our histogram earlier, we saw that some grades are more commonly earned than others. Specifically, many students earn grades of 0, 9 or 10, but there are very few/no students who earn a grade of 4. Because the grades are so disproportionately spread out, this might cause a problem if we use a classification model. There wouldn't be "enough" grades in each level/category for the model to be trained well. Because of this problem, let's try fitting models in both regression and classification.
+The next tricky question is: Should we use regression or classification? Technically G3 grades are discrete, for example a student can get a grade of 0, 1, 4, 5, but nothing like 1.5 or 4.33. However, from our histogram earlier, we saw that some grades are more commonly earned than others. Specifically, many students earn grades of 0, 9 or 10, but there are very few/no students who earn a grade of 4. Because the grades are so disproportionately spread out, this might cause a problem if we use a classification model. There wouldn't be "enough" grades in each level/category for the model to be trained well. Because of this problem, let's try fitting models in both regression and classification.
 
-Note: From here onward, I will be fitting two models per method. This represents one model for each method of data splitting. (ex. linear regression model for Method 1.merged dataset, linear regression model for Method 2. Portuguese=training, Maths=testing) We will then compare the models against each method and see which gives us better predictions.
+Note: I will be fitting two models per method. (ex. linear regression model for Method 1. merged dataset, linear regression model for Method 2. Portuguese=training, Maths=testing) We will then compare the models to see which method gives us better predictions.
 
-### Regression
+## Regression
 
 We will make 2 recipes, the first one we use when working with Method 1. merged dataset (has course variable) and the second we use when working with Method 2. Portuguese for training, Maths for testing (without course variable). 
 
-The reason for this is because for Method 2, we split the data into training/testing by course. However, when we fit models and predict, having course=Portuguese for training and course=Math for testing throws an error because the model won't know how to carry over its knowledge when there is only one level (Portuguese) in the training data, and one level (Maths) in the testing data. Therefore we need this 2nd recipe without the course variable, and we need grades_train2_nocourse and grades_test2_nocourse to fit the model.
+This is because for Method 2, we split the data into training/testing by course. However, when we fit models and predict, having course=Portuguese for training and course=Math for testing throws an error because the model won't know how to carry over its knowledge when there is only one level (Portuguese) in the training data, and one level (Maths) in the testing data. Therefore we need this 2nd recipe without the course variable, and we need grades_train2_nocourse and grades_test2_nocourse to fit the model.
 
 ```{r}
 # recipe for Method 1. merged dataset
@@ -206,9 +324,11 @@ grades_recipe2 <- recipe(g3 ~ ., data=all_classes) %>%
   step_dummy(all_nominal_predictors())
 ```
 
-We'll begin with a linear regression model.
+### Linear Regression
 
-#### Linear Regression Model (Method 1. merged dataset)
+We'll begin with linear regression. We set the engine for linear regression "lm", create a workflow with the recipe we made, and fit the training data to the model. Then we can bind our predicted values to the actual observations to see how the model performed.
+
+#### Method 1. merged dataset
 
 ```{r}
 lm_model <- linear_reg() %>% 
@@ -248,7 +368,11 @@ grades_metrics1(grades_train_res, truth = g3,
                 estimate = .pred)
 ```
 
-#### Linear Regression Model (Method 2. Portuguese for training, Maths for testing)
+We also have a plot of our predictions to the actual G3 grades. The model was on the right track, but isn't completely accurate. (hypothetically then all the dots would fall on the dotted line) It looks like the model was especially bad at predicting G3 grades of 0.
+
+#### Method 2. Portuguese for training, Maths for testing
+
+Here, we repeat the process of setting the engine, creating workflow, and fitting the model like we did above. Except this time we use the training dataset from Method 2.
 
 ```{r}
 lm_model <- linear_reg() %>% 
@@ -288,16 +412,18 @@ grades_metrics2(grades_train_res2, truth = g3,
                 estimate = .pred)
 ```
 
-From our two linear regression models above, we see that both have values of rmse of greater than 1. This shows that the model didn't perform particularly well, or isn't optimized well. We have a high rmse, and generally the closer rmse is to 0, the better our model is. We also have a high mae, which isn't great because the closer mae is to 0, the better. Between the two models, it looks like Method 2. gave us better predictions. Let's try some classification methods instead and see if they perform better!
+The plot shows that the Method 2 model is also quite bad at predicting G3 grades of 0, for other grades it does a little better, but still not the kind of accuracy we're looking for.
+
+From our two linear regression models above, we see that both have values of rmse of greater than 1. This shows that the model didn't perform particularly well, or isn't optimized well. We have a high rmse, and generally the closer rmse is to 0, the better our model is. We also have a high mae, which isn't great because the closer mae is to 0, the better. Between the two models, it looks like Method 2 gave us better predictions. Let's try some classification methods instead and see if they perform better!
 
 
-### Classification
+## Classification
 
 Before we try fitting classification methods, we should remember the issue discussed earlier. For classification methods, we will need to convert G3 grades to a factor type with different levels. However, because some grades were "more common" (earned by more students than others), there may not be enough student grades data in each "grade category". (ex. grade 0, grade 1, grade 2, etc.)
 If we create a level for each individual grade, we will run into the problem of disproportionate categories.
-Instead, (advised by my TA Hanmo) we can group the G3 grades into two levels of "Pass" and "Fail." The split between "Pass" and "Fail" is arbitrarily decided, it can be changed depending on the context/use of the model. I simply chose to group grades 0-10 as "Fail", and grades 11-20 as "Pass." Creating two new factor levels will hopefully remedy our problem of not having enough student grades in each category/level, because we are grouping much more data together.
+Instead, (advised by my TA Hanmo) we can group the G3 grades into two levels of "Pass" and "Fail." The split between "Pass" and "Fail" is arbitrarily decided, it can be changed depending on the context/use of the model. I chose to group grades 0-10 as "Fail", and grades 11-20 as "Pass." Creating new factor levels will group much more data together and hopefully solve the problem of not having enough student grades in each level.
 
-Before we fit any models however, we need to convert our outcome variable G3 into a factor and give it the new levels of "Pass" and "Fail." Again, we do this for the dataset that has course labels, and the dataset without course labels. Be sure to check that the new factor levels have been assigned correctly!
+Before we fit any models however, we need to convert our outcome variable G3 into a factor and give it the new levels of "Pass" and "Fail." Be sure to check that the new factor levels have been assigned correctly!
 
 ```{r}
 # convert outcome variable to factor first!
@@ -324,7 +450,7 @@ levels(all_classes2_fctr$g3) <- list("Fail"="0", "Fail"="1", "Fail"="4", "Fail"=
 all_classes2_fctr$g3 %>% head()
 ```
 
-We take our datasets with the new factor outcome variable and split it with two different ways, just like we did above. Method 1. merged dataset, Method 2. Portuguese = training, Maths = testing
+We take our datasets with the new factor outcome variable and split it with two different ways, just like we did before. Method 1. merged dataset, Method 2. Portuguese = training, Maths = testing
 
 ```{r}
 set.seed(3435)
@@ -351,7 +477,7 @@ grades_test2_fctr_nocourse <- grades_test2_fctr %>%
   select(-course)
 ```
 
-Let's make 2 recipes (like we did above) for the classification models with the data, except this time our outcome G3 is a factor.
+Let's make 2 recipes (like we did above with regression) for the classification models with the data, except this time our outcome variable, G3, is a factor.
 
 ```{r}
 # recipe for Method 1. merged dataset
@@ -387,10 +513,13 @@ For the classification models, here are the steps we need to take:
 
 8. Repeat steps for Method 2, we need to try both methods to see which one gives more accurate results.
 
+Let's begin with logistic regression. Then we'll try linear discriminant analysis (LDA) and quadratic discriminant analysis (QDA). Lastly, we can fit our data in folds to the method that works the best.
 
-Let's begin with logistic regression. Then we'll try linear discriminant analysis (LDA) and quadratic discriminant analysis (QDA).
+### Logistic Regression
 
-#### Logistic Regression Model (Method 1. merged dataset)
+Just like we did with linear regression, for logistic regression we begin by setting the appropriate engine "glm", creating a workflow, and adding the new recipe we created. Then we fit the model to the training data. Here I've created a confusion matrix and calculated the accuracy, roc_auc to give a better idea of how the model performed.
+
+#### Method 1. merged dataset
 
 ```{r}
 log_reg <- logistic_reg() %>% 
@@ -407,19 +536,23 @@ log_fit %>%
   tidy()
 
 # predictions
-predict(log_fit, new_data = grades_train_fctr, type = "prob")
+predict(log_fit, new_data = grades_train_fctr, type = "prob") %>% head()
 
 # confusion matrix
 augment(log_fit, new_data = grades_train_fctr) %>%
   conf_mat(truth = g3, estimate = .pred_class)
 
-# accuracy
-log_reg_acc <- augment(log_fit, new_data = grades_train_fctr) %>%
+# accuracy and roc_auc
+augment(log_fit, new_data = grades_train_fctr) %>%
   accuracy(truth = g3, estimate = .pred_class)
-log_reg_acc
+
+augment(log_fit, new_data = grades_train_fctr) %>%
+  roc_auc(truth = g3, estimate = .pred_Fail)
 ```
 
-#### Logistic Regression Model (Method 2. Portuguese for training, Maths for testing)
+#### Method 2. Portuguese for training, Maths for testing
+
+Repeat the same steps for Method 2:
 
 ```{r}
 log_reg <- logistic_reg() %>% 
@@ -436,21 +569,27 @@ log_fit2 %>%
   tidy()
 
 # predict
-predict(log_fit2, new_data = grades_train2_fctr, type = "prob")
+predict(log_fit2, new_data = grades_train2_fctr, type = "prob") %>% head()
 
 # confusion matrix
 augment(log_fit2, new_data = grades_train2_fctr) %>%
   conf_mat(truth = g3, estimate = .pred_class)
 
-# accuracy
-log_reg_acc2 <- augment(log_fit2, new_data = grades_train2_fctr) %>%
+# accuracy and roc_auc
+augment(log_fit2, new_data = grades_train2_fctr) %>%
   accuracy(truth = g3, estimate = .pred_class)
-log_reg_acc2
+
+augment(log_fit2, new_data = grades_train2_fctr) %>%
+  roc_auc(truth = g3, estimate = .pred_Fail)
 ```
 
-Both data methods gave us accuracies greater than 0.9, that's really good! Will LDA or QDA give us better results?
+Both data methods gave us roc_auc and accuracies greater than 0.9, that's really good! Will LDA or QDA give us better results?
 
-#### Linear Discriminant Analysis (LDA) Model (Method 1. merged dataset)
+### Linear Discriminant Analysis (LDA)
+
+The engine for LDA is "MASS" and remember to set the mode to "classification"! Create a workflow and add the recipe. Then repeat the steps we did with logistic regression.
+
+#### Method 1. merged dataset
 
 ```{r}
 lda_mod <- discrim_linear() %>% 
@@ -466,19 +605,23 @@ lda_wkflow <- workflow() %>%
 lda_fit <- fit(lda_wkflow, grades_train_fctr)
 
 # predict
-predict(lda_fit, new_data = grades_train_fctr, type = "prob")
+predict(lda_fit, new_data = grades_train_fctr, type = "prob") %>% head()
 
 # confusion matrix
 augment(lda_fit, new_data = grades_train_fctr) %>%
   conf_mat(truth = g3, estimate = .pred_class)
 
-# accuracy
-lda_acc <- augment(lda_fit, new_data = grades_train_fctr) %>%
+# accuracy and roc_auc
+augment(lda_fit, new_data = grades_train_fctr) %>%
   accuracy(truth = g3, estimate = .pred_class)
-lda_acc
+
+augment(lda_fit, new_data = grades_train_fctr) %>%
+  roc_auc(truth = g3, estimate = .pred_Fail)
 ```
 
-#### Linear Discriminant Analysis (LDA) Model (Method 2. Portuguese for training, Maths for testing)
+#### Method 2. Portuguese for training, Maths for testing
+
+Repeat the same steps for Method 2:
 
 ```{r}
 lda_mod <- discrim_linear() %>% 
@@ -494,21 +637,27 @@ lda_wkflow2 <- workflow() %>%
 lda_fit2 <- fit(lda_wkflow2, grades_train2_fctr)
 
 # predict
-predict(lda_fit2, new_data = grades_train2_fctr, type = "prob")
+predict(lda_fit2, new_data = grades_train2_fctr, type = "prob") %>% head()
 
 # confusion matrix
 augment(lda_fit2, new_data = grades_train2_fctr) %>%
   conf_mat(truth = g3, estimate = .pred_class)
 
-# accuracy
-lda_acc2 <- augment(lda_fit2, new_data = grades_train2_fctr) %>%
+# accuracy and roc_auc
+augment(lda_fit2, new_data = grades_train2_fctr) %>%
   accuracy(truth = g3, estimate = .pred_class)
-lda_acc2
+
+augment(lda_fit2, new_data = grades_train2_fctr) %>%
+  roc_auc(truth = g3, estimate = .pred_Fail)
 ```
 
-The accuracies from LDA are slightly lower than what we got for logistic regression. If we were to pick one of the two models, we should probably go with logistic regression, because it is very similar to LDA, but less complex in some aspects. But before we choose, let's check QDA too.
+The roc_auc from logistic regression are slightly higher than those from LDA, and in contrast, the accuracies from LDA are slightly lower than what we got for logistic regression. If we were to pick one of the two models, we should probably go with logistic regression, because it is very similar to LDA, but less complex in some aspects. But before we choose, let's check QDA too.
 
-#### Quadratic Discriminant Analysis (QDA) Model (Method 1. merged dataset)
+### Quadratic Discriminant Analysis (QDA)
+
+#### Method 1. merged dataset
+
+Similar to LDA, the QDA engine is "MASS" and mode is "classification". But pay attention because instead of discrim_linear(), we are using discrim_quad() for QDA. The rest of the steps are same as we did before.
 
 ```{r}
 qda_mod <- discrim_quad() %>% 
@@ -524,7 +673,7 @@ qda_wkflow <- workflow() %>%
 qda_fit <- fit(qda_wkflow, grades_train_fctr)
 
 # predict
-predict(qda_fit, new_data = grades_train_fctr, type = "prob")
+predict(qda_fit, new_data = grades_train_fctr, type = "prob") %>% head()
 
 # confusion matrix
 augment(qda_fit, new_data = grades_train_fctr) %>%
@@ -538,7 +687,9 @@ augment(qda_fit, new_data = grades_train_fctr) %>%
   roc_auc(truth = g3, estimate = .pred_Fail)
 ```
 
-#### Quadratic Discriminant Analysis (QDA) Model (Method 2. Portuguese for training, Maths for testing)
+#### Method 2. Portuguese for training, Maths for testing
+
+Repeat the same steps for Method 2:
 
 ```{r}
 qda_mod <- discrim_quad() %>% 
@@ -554,7 +705,7 @@ qda_wkflow2 <- workflow() %>%
 qda_fit2 <- fit(qda_wkflow2, grades_train2_fctr)
 
 # predict
-predict(qda_fit2, new_data = grades_train2_fctr, type = "prob")
+predict(qda_fit2, new_data = grades_train2_fctr, type = "prob") %>% head()
 
 # confusion matrix
 augment(qda_fit2, new_data = grades_train2_fctr) %>%
@@ -568,24 +719,26 @@ augment(qda_fit2, new_data = grades_train2_fctr) %>%
   roc_auc(truth = g3, estimate = .pred_Fail)
 ```
 
-From the three different models, like logistic regression, specifically Method 2, giving us the highest accuracy of 0.9322034. We also notice that for logistic regression and QDA, Method 2 (Portuguese=training, Maths=testing) of data splitting gave higher accuracy. But for QDA, Method 1 (merged dataset) of data splitting gave a higher accuracy.
-
+QDA did similarly to LDA in terms of accuracy and roc_auc. From these three models, logistic regression Method 1 gave us the best roc_auc and accuracy.
 
 ### K-fold Cross Validation
 
-We can try k-fold cross validation on the model that performed best out of classification models (logistic regression). Let's use 10 folds and try it on both the methods of data splitting. Will the Method 1. merged dataset or Method 2. Portuguese/Maths split dataset give us better results?
+K-fold cross validation is when we split up the training data into k groups and use certain groups to "validate" or check. This process is often used to train a model more thoroughly when we don't have enough data. We can try k-fold cross validation on the logistic regression model that performed best out of classification models. Let's use 10 folds and see if it gives us better results than the model that didn't use folds.
 
-Before we jump in, first, some definitions. AUC is the "area under the curve." "Curve" refers to an ROC curve. AUC represents the model's capability of distinguishing between classes. In our scenario, AUC is measuring how capable each model is at distinguishing students who "Fail" from students who "Pass."
-We will also be plotting ROC curves. This website's says "A ROC curve is constructed by plotting the true positive rate (TPR) against the false positive rate (FPR)." https://www.displayr.com/what-is-a-roc-curve-how-to-interpret-it/
+Before we jump in, first, some definitions.
+*   AUC is the "area under the curve." "Curve" refers to an ROC curve. AUC represents the model's capability of distinguishing between classes. In our scenario, AUC is measuring how capable each model is at distinguishing students who "Fail" from students who "Pass."
+*   We will also be plotting ROC curves. This website says "A ROC curve is constructed by plotting the true positive rate (TPR) against the false positive rate (FPR)." https://www.displayr.com/what-is-a-roc-curve-how-to-interpret-it/
 Basically, an ROC curve measures a model's performance at classifying the data into the correct categories (ex. "Fail", "Pass")
 
 #### Method 1. merged dataset
+
+First, use the vfold_cv() function to set the number of folds we want. We'll use 10, and stratify on g3 to make sure that the folds are proportional to the original training dataset! Set the engine and create the workflow as before, then instead of using fit(), we use fit_resamples() so that R knows we want to fit to the folds of data we set up. We can make a confusion matrix, calculate the accuracy, roc_auc, and plot the ROC curve as well. How did the k-fold cross validation model compare to the original?
 
 ```{r, message = F, warning = F}
 set.seed(3435)
 
 # 10-fold cross validation
-grades_folds_fctr <- vfold_cv(grades_train_fctr, v = 10)
+grades_folds_fctr <- vfold_cv(grades_train_fctr, v = 10, strata = g3)
 
 # logistic regression model
 log_reg <- logistic_reg() %>% 
@@ -601,28 +754,19 @@ fit_log_kfold <- fit_resamples(log_wkflow,
                         grades_folds_fctr,
                         control = control_resamples(save_pred = TRUE))
 
-# fit model to entire training dataset
-final_fit <- fit(log_wkflow, grades_train_fctr)
-
-# bind predictions to actual observations
-grades_predicted <- predict(final_fit, new_data = grades_train_fctr)
-grades_predicted <- bind_cols(grades_predicted, grades_train_fctr %>% select(g3))
-grades_predicted
-
 # confusion matrix
-augment(final_fit, new_data = grades_train_fctr) %>%
+augment(fit_log_kfold) %>%
   conf_mat(truth = g3, estimate = .pred_class)
 
 # accuracy and roc_auc
-multi_metric <- metric_set(accuracy, sensitivity, specificity)
-augment(final_fit, new_data = grades_train_fctr) %>%
-  multi_metric(truth = g3, estimate = .pred_class)
+augment(fit_log_kfold) %>%
+  accuracy(truth = g3, estimate = .pred_class)
 
-augment(final_fit, new_data = grades_train_fctr) %>%
+augment(fit_log_kfold) %>%
   roc_auc(truth = g3, estimate = .pred_Fail)
 
 # ROC curve
-augment(final_fit, new_data = grades_train_fctr) %>%
+augment(fit_log_kfold) %>%
   roc_curve(truth = grades_train_fctr$g3, estimate = .pred_Fail) %>%
   autoplot()
 ```
@@ -633,7 +777,7 @@ augment(final_fit, new_data = grades_train_fctr) %>%
 set.seed(3435)
 
 # 10-fold cross validation
-grades_folds2_fctr <- vfold_cv(grades_train2_fctr, v = 10)
+grades_folds2_fctr <- vfold_cv(grades_train2_fctr, v = 10, strata = g3)
 
 # logistic regression model
 log_reg <- logistic_reg() %>% 
@@ -649,41 +793,33 @@ fit_log2_kfold <- fit_resamples(log_wkflow2,
                         grades_folds2_fctr,
                         control = control_resamples(save_pred = TRUE))
 
-# fit model to entire training dataset
-final_fit2 <- fit(log_wkflow2, grades_train2_fctr)
-
-# bind predictions to actual observations
-grades_predicted2 <- predict(final_fit2, new_data = grades_train2_fctr, type = "prob")
-grades_predicted2 <- bind_cols(grades_predicted2, grades_train2_fctr %>% select(g3))
-grades_predicted2
-
 # confusion matrix
-augment(final_fit2, new_data = grades_train2_fctr) %>%
+augment(fit_log2_kfold) %>%
   conf_mat(truth = g3, estimate = .pred_class)
 
 # accuracy and roc_auc
-augment(final_fit2, new_data = grades_train2_fctr) %>%
-  multi_metric(truth = g3, estimate = .pred_class)
+augment(fit_log2_kfold) %>%
+  accuracy(truth = g3, estimate = .pred_class)
 
-augment(final_fit2, new_data = grades_train2_fctr) %>%
+augment(fit_log2_kfold) %>%
   roc_auc(truth = g3, estimate = .pred_Fail)
 
 # ROC curve Method 2
-augment(final_fit2, new_data = grades_train2_fctr) %>%
+augment(fit_log2_kfold) %>%
   roc_curve(truth = grades_train2_fctr$g3, estimate = .pred_Fail) %>%
   autoplot()
 ```
 
-The ROC curves of two models are extremely similar, with slight variation at the middle of the curve. If we compare the ROC_AUC values, we see that the value for Method 1 is slightly bigger than the value for method 2. This is consistent with our results from the accuracy metrics above.
+The ROC curves of two models are extremely similar, with slight variation at the middle of the curve. The roc_auc value for Method 1 is slightly higher than the value for Method 2. This is consistent with the accuracy as well. Did you notice that the accuracy and roc_auc actually went down when we used k-fold cross validation compared to the results from the original logistic regression model? Any ideas on why this might be?
 
 ### Elastic Net Tuning
 
 Next, let's try the elastic net method, where we tune the parameters of mixture and penalty. This is an a model that uses an "in between" penalty term in comparison to ridge and lasso regression (where the penalty terms are 0 and as close to infinity as possible, respectively).
-Again, we fit the elastic net model to both Method 1 and Method 2 data to see which gives us better results.
+*   Tuning is the process of: choosing several values of a parameter, fitting the model to those values, and choosing the value that gives use the best result.
 
 #### Method 1. merged dataset
 
-First we prepare our data by splitting into 5-folds for cross validation. Then we set the engine and create a workflow for multinomial regression (which is used for the elastic net method). Like we mentioned before, we want to tune the mixture and penalty parameters to see which values give us the best results.
+First we prepare our data by splitting into 5-folds for cross validation. Then we set the engine for multinomial regression "glmnet" and mode "classification" with multinom_reg. Create a workflow and add the recipe from earlier. In the elastic net model, We want to tune the mixture and penalty parameters to see which values give us the best results. To do this, we set up a grid, which contains the range of values we want to choose from.
 
 ```{r}
 set.seed(3435)
@@ -704,6 +840,8 @@ multinom_reg_wf <- workflow() %>%
 # grid for penalty and mixture
 grid_pm_en <- grid_regular(mixture(range = c(0, 1)), penalty(range = c(-5, 5)), levels = c(mixture = 10, penalty = 10))
 ```
+
+tune_grid() is the function that chooses various values of parameters from the grid we created and fits a model for each parameter value.
 
 ```{r, eval = F}
 tune_res_elasticnet <- tune_grid(
@@ -726,13 +864,14 @@ tune_res_elasticnet <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/F
 autoplot(tune_res_elasticnet)
 ```
 
+We can show the parameters that gave us the top results based on roc_auc. Then select the best one, and fit the entire training dataset to the model with the best parameter value.
+
 ```{r}
 # show the best models according to roc_auc
 show_best(tune_res_elasticnet, metric = "roc_auc")
 
 # select the best
 en_best_rocauc <- select_best(tune_res_elasticnet, metric = "roc_auc")
-en_best_rocauc
 
 # fit model to training set
 elasticnet1_final <- finalize_workflow(multinom_reg_wf, en_best_rocauc)
@@ -755,8 +894,11 @@ augment(elasticnet1_final_fit, new_data = grades_train_fctr) %>%
   roc_curve(truth = g3, estimate = .pred_Fail) %>%
   autoplot()
 ```
+After viewing the confucsion matrix, accuracy, roc_auc, and ROC curve, we see that it also gave us accuracy and roc_auc over 0.9.
 
 #### Method 2. Portuguese for training, Maths for testing
+
+Repeat the same steps for Method 2:
 
 ```{r}
 set.seed(3435)
@@ -800,7 +942,6 @@ show_best(tune_res_elasticnet2, metric = "roc_auc")
 
 # select the best
 en_best_rocauc2 <- select_best(tune_res_elasticnet2, metric = "roc_auc")
-en_best_rocauc2
 
 # fit model to training set
 elasticnet2_final <- finalize_workflow(multinom_reg_wf2, en_best_rocauc2)
@@ -824,11 +965,11 @@ augment(elasticnet2_final_fit, new_data = grades_train2_fctr_nocourse) %>%
   autoplot()
 ```
 
-From the results above, Method 1 gives us better accuracy and roc_auc when fitted to the elastic net model. We can verify the details by observing the confusion matrix and plotting ROC curves for each method. Are there any other models that can give us even better results?
+While Method 2 also performed well, we got better accuracy and roc_auc using Method 1 on the elastic net model. We can verify the details by observing the confusion matrix and plotting ROC curves for each method. Are there any other models that can give us even better results?
 
 ### Decision Tree
 
-Next, we move to the tree model family. A decision tree is one type of tree model. You can think of a decision tree as a branching method that looks at every possible output for a specific input. Take a look at the visualization in the next code chunk.
+Next, we move to the tree model family. A decision tree is one type of tree model, you can think of a decision tree as a branching method that looks at every possible output for a specific input. We can take a look at the visualization of a decision tree.
 
 #### Method 1. merged dataset
 
@@ -848,8 +989,8 @@ class_tree_fit %>%
   extract_fit_engine() %>%
   rpart.plot()
 ```
-Like the previous models, we set an engine for the decision tree model. We also make a grid to tune the cost complexity parameter. Note, the cost complexity parameter is very important because it helps "prune" the tree. This means it reduces the size of the tree and keeps the tree from having "too many branches" or "leaf nodes." A tree that has too many branches or leaf nodes could lead to model overfitting.
-Let's set up the engine and workflow for a decision tree. Here, we tune the cost complexity parameter, to see which value gives us the best results.
+Like the previous models, we set an engine and make a grid to tune the appropriate parameters. The cost complexity parameter is very important because it helps "prune" the tree. This means it reduces the size of the tree and keeps the tree from having "too many branches" or "leaf nodes." A tree that has too many branches or leaf nodes could lead to model overfitting.
+Let's set up the engine and workflow for a decision tree. Here, we tune the cost complexity parameter and see which value gives us the best results.
 
 ```{r}
 # decision tree engine
@@ -867,6 +1008,8 @@ set.seed(3435)
 param_grid <- grid_regular(cost_complexity(range = c(-3, -1)), levels = 10)
 ```
 
+This time our grid holds the values of the cost complexity parameter. Below, we tune the model to see which cost complexity parameter gives us the best accuracy and roc_auc. Note: we use the same number of folds we made earlier with the elastic net model!
+
 ```{r, eval = F}
 # fit with tune_grid
 classtree_tune_res <- tune_grid(
@@ -880,7 +1023,7 @@ classtree_tune_res <- tune_grid(
 write_rds(classtree_tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/classtree_tune_res.rds")
 ```
 
-Next, we plot a comparison of the cost-complexity parameter to accuracy and roc_auc. What do you notice? It looks like accuracy peaks and flattens at about 0.92 once we reach a cost complexity of about 0.02.
+Plot a comparison of the cost-complexity parameter to accuracy and roc_auc. What do you notice? It looks like accuracy peaks and flattens at about 0.92 once we reach a cost complexity of about 0.02. Meanwhile, roc_auc is the largest (a bit more than 0.95) when the cost-complexity parameter is small at 0.001.
 
 ```{r}
 # read file
@@ -890,7 +1033,7 @@ classtree_tune_res <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fa
 autoplot(classtree_tune_res)
 ```
 
-We can take a closer look at all the values of the cost complexity parameter, and choose the one that gives us the best results. This matches what we see in the plot above, so that's good.
+We can take a closer look at all the tuned values of cost-complexity, and choose the one that gives us the best results. This matches what we see in the plot above, which is good.
 
 ```{r}
 # show the best models according to roc_auc
@@ -898,7 +1041,6 @@ show_best(classtree_tune_res, metric = "roc_auc")
 
 # select the best
 classtree_best_complexity <- select_best(classtree_tune_res, metric = "roc_auc")
-classtree_best_complexity
 
 # fit
 classtree_final1 <- finalize_workflow(class_tree_wf, classtree_best_complexity)
@@ -914,6 +1056,8 @@ augment(classtree_final1_fit, new_data = grades_train_fctr) %>%
 
 
 #### Method 2. Portuguese for training, Maths for testing
+
+Repeat the same steps for Method 2:
 
 ```{r, warning = F}
 # decision tree engine
@@ -964,8 +1108,8 @@ classtree_tune_res2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/F
 # cost-complexity autoplot
 autoplot(classtree_tune_res2)
 ```
-Now this plot looks very different from the one we got for Method 1. This time, it seems that the cost-complexity parameter increases, peaks, drops very steeply, increases a bit, then levels out again. Why do you think this is?
-We look at all the values of the cost complexity parameter, and choose the one that gives us the best results. This matches what we see in the plot above.
+Now this plot looks very different from the one we got for Method 1. This time, it seems that the cost-complexity parameter increases, peaks, drops very steeply, increases a bit, then levels out again. Why do you think this is? Accuracy peaks at just below 0.908 with a cost-complexity of 0.03. roc_auc peaks at around 0.93 also at a cost-complexity of 0.03.
+Again, we look at all the values of cost complexity and choose the one that gives us the best results. This matches what our plot above.
 
 ```{r}
 # show the best models according to roc_auc
@@ -973,7 +1117,6 @@ show_best(classtree_tune_res2, metric = "roc_auc")
 
 # select the best
 classtree_best_complexity2 <- select_best(classtree_tune_res2, , metric = "roc_auc")
-classtree_best_complexity2
 
 # fit
 classtree_final2 <- finalize_workflow(class_tree_wf2, classtree_best_complexity2)
@@ -987,14 +1130,16 @@ augment(classtree_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
   roc_auc(truth = g3, estimate = .pred_Fail)
 ```
 
+Between the decision tree models, Method 1 gave us significantly better results than Method 2. Method 1 accuracy was 0.9410959 and roc_auc was 0.9768124. In contrast, Method 2 accuracy was 0.9152542 and roc_auc was 0.9316911. Will fitting multiple trees give us better results than a single decision tree? One example is a boosted tree model.
+
 ### Boosted Tree
 
-Will a boosted tree model give us better results than a decision tree? A boosted tree is like a decision tree, but boosting means that each tree is dependent on prior trees. Boosting uses a group of decision tree models, and learns by fitting the residual of the trees before it. 
-Technically we could also try a random forest model, which is also constructed using multiple decision trees. The difference between the two is that each tree in random forests are independent, whereas the trees in boosted tree models are dependent. But because random forests and boosted tree models involve multiple decision trees, they take a long time to run. For the sake of time, we'll just try out a boosted tree.
+A boosted tree is like a decision tree, but boosting means that each tree is dependent on prior trees. Boosting uses a group of decision tree models, and learns by fitting the residual of the trees before it. 
+A random forest model is also constructed using multiple decision trees. The difference between the two is that each tree in random forests are independent, whereas the trees in boosted tree models are dependent. But because random forests and boosted tree models involve multiple decision trees, they take a long time to run. For the sake of time, we'll just try out one of the two options.
 
 #### Method 1. merged dataset
 
-First, specify the boosted tree engine, workflow, and create a grid to tune the number of trees. Tuning will help us find the number of trees that gives us the best results.
+We specify the engine "xgboost" and mode "classification" with boost_tree(). As you might have noticed, several classification models we've fitted have made us specify a mode. It is extremely important to specify because some engines work with both regression and classification. A boosted tree is one of these. We make our workflow, and specify to tune the number of trees. Then we create a grid to hold the values for tuning. Tuning will help us find the optimal number of trees.
 
 ```{r}
 # set boosted tree engine
@@ -1012,6 +1157,8 @@ param_grid2 <- grid_regular(trees(range = c(10, 2000)),
                             levels = 10)
 ```
 
+The tune_grid() process is the same as before, we use the folds created above in the elastic net model, and the grid we made.
+
 ```{r, eval = F}
 # fit using tune_grid
 boostedtree_tune_res <- tune_grid(
@@ -1025,7 +1172,7 @@ boostedtree_tune_res <- tune_grid(
 write_rds(boostedtree_tune_res, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res.rds")
 ```
 
-Let's plot the accuracies. The plot matches our metrics results, showing us that accuracy peaks at 0.8972186 around 1115 trees. 
+Making some plots shows us that both accuracy and roc_auc are highest when the number of trees is small, around 10. 
 
 ```{r}
 boostedtree_tune_res <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res.rds")
@@ -1040,11 +1187,15 @@ show_best(boostedtree_tune_res, metric = "roc_auc")
 
 # select the best
 boostedtree_best_complexity <- select_best(boostedtree_tune_res, metric = "roc_auc")
-boostedtree_best_complexity
 
 # fit
 xgb_final1 <- finalize_workflow(xgb_wf, boostedtree_best_complexity)
 xgb_final_fit1 <- fit(xgb_final1, data = grades_train_fctr)
+
+# confusion matrix
+augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
+  conf_mat(truth = g3, estimate = .pred_class) %>%
+  autoplot(type = "heatmap")
 
 # evaluate accuracy and roc_auc
 augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
@@ -1052,14 +1203,18 @@ augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
 
 augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
   roc_auc(truth = g3, estimate = .pred_Fail)
+
+# roc curve
+augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
+  roc_curve(truth = g3, estimate = .pred_Fail) %>%
+  autoplot()
 ```
 
-
-The highest accuracy we get is 0.8972186, but we get an ROC AUC of 1. Why do you think this is? It may be because the model is biased, performing well on one class, but has some false negatives as well.
+Method 1 gives us an accuracy of 0.9767123, and roc_auc of 0.9979243. That's close to perfect! The results match our ROC curve as well. Will Method 2 do any better?
 
 #### Method 2. Portuguese for training, Maths for testing
 
-Here we'll do the same for Method 2. 
+Repeat the same steps for Method 2:
 
 ```{r}
 # set boosted tree engine
@@ -1090,7 +1245,7 @@ boostedtree_tune_res2 <- tune_grid(
 write_rds(boostedtree_tune_res2, file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res2.rds")
 ```
 
-This time it looks like accuracy peaks at 0.8981952 with about 231 trees, which is consistent with our plot.
+This time it looks like accuracy is highest when the number of trees is close to 100, whereas roc_auc is highest once again when the number of trees is small, around 10.
 
 ```{r}
 boostedtree_tune_res2 <- read_rds(file = "C:/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/saved_models/boostedtree_tune_res2.rds")
@@ -1105,11 +1260,15 @@ show_best(boostedtree_tune_res2, metric = "roc_auc")
 
 # select the best
 boostedtree_best_complexity2 <- select_best(boostedtree_tune_res2, metric = "roc_auc")
-boostedtree_best_complexity2
 
 # fit
 xgb_final2 <- finalize_workflow(xgb_wf2, boostedtree_best_complexity2)
 xgb_final_fit2 <- fit(xgb_final2, data = grades_train2_fctr_nocourse)
+
+# confusion matrix
+augment(xgb_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
+  conf_mat(truth = g3, estimate = .pred_class) %>%
+  autoplot(type = "heatmap")
 
 # evaluate accuracy and roc_auc
 augment(xgb_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
@@ -1117,39 +1276,18 @@ augment(xgb_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
 
 augment(xgb_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
   roc_auc(truth = g3, estimate = .pred_Fail)
-```
-
-Let us fit the boosted tree model to our testing data and see how it performs.
-
-In review, after analyzing both of our boosted tree models, Method 2 of data splitting gave us a slightly higher accuracy of 0.8981952. Let us now fit the data to our Method 1, which had the higher roc_auc. We can observe the results by making a ROC curve and heatmap of the confusion matrix to see if the results line up with our ROC AUC value.
-
-```{r}
-# select the best (boosted tree)
-best_rocauc <- select_best(boostedtree_tune_res, metric = "roc_auc")
-
-# fit
-rocauc_final <- finalize_workflow(xgb_wf, boostedtree_best_complexity)
-rocauc_final_fit <- fit(rocauc_final, data = grades_train_fctr)
-
-# roc_auc
-augment(xgb_final_fit1, new_data = grades_train_fctr) %>%
-  roc_auc(truth = g3, estimate = .pred_Fail) %>%
-  select(.estimate)
 
 # roc curve
-augment(rocauc_final_fit, new_data = grades_train_fctr) %>%
+augment(xgb_final_fit2, new_data = grades_train2_fctr_nocourse) %>%
   roc_curve(truth = g3, estimate = .pred_Fail) %>%
   autoplot()
-
-# confusion matrix
-augment(rocauc_final_fit, new_data = grades_train_fctr) %>%
-  conf_mat(truth = g3, estimate = .pred_class) %>%
-  autoplot(type = "heatmap")
 ```
+
+Method 2 also does very well, the accuracy of 0.9799692 is higher than Method 1 but the roc_auc of 0.996979 is lower than Method 1. Both boosted tree models have given us the highest accuracy and roc_auc values out of all the models fitted so far.
 
 ## Conclusion
 
-After testing both regression and classification methods, it seems like most of our classification models performed better than the regression models.
+After testing both regression and classification methods, we have determined that most of our classification models performed better than the regression models. But between all of the classification models we fitted, which was the best? Let's compare the roc_auc values of all the models.
 
 ```{r}
 # Logistic Regression
@@ -1180,11 +1318,11 @@ grades_qda_auc2 <- augment(qda_fit2, new_data = grades_train2_fctr) %>%
   select(.estimate)
 
 # Log K-Fold CV
-grades_log_kfold_auc <- augment(final_fit, new_data = grades_train_fctr) %>%
+grades_log_kfold_auc <- augment(fit_log_kfold) %>%
   roc_auc(truth = g3, estimate = .pred_Fail) %>%
   select(.estimate)
 
-grades_log_kfold_auc2 <- augment(final_fit2, new_data = grades_train2_fctr) %>%
+grades_log_kfold_auc2 <- augment(fit_log2_kfold) %>%
   roc_auc(truth = g3, estimate = .pred_Fail) %>%
   select(.estimate)
 
@@ -1255,12 +1393,11 @@ grades_results <- grades_results %>%
 
 grades_results
 ```
-
-These here are our classification models. We can make a dot plot to visualize these results.
+These here are the roc_auc values of our classification models. A dot plot will help visualize the results.
 
 ```{r}
 grades_dot_plot <- ggplot(grades_results, aes(x = Model, y = ROC_AUC)) +
-  geom_point(fill = "#FB4F14", col = "#FB4F14", size=10) + 
+  geom_point(fill = "blue", col = "blue", size=5) + 
   geom_segment(aes(x = Model, 
                    xend = Model, 
                    y=min(ROC_AUC), 
@@ -1275,18 +1412,14 @@ grades_dot_plot <- ggplot(grades_results, aes(x = Model, y = ROC_AUC)) +
 ```{r}
 grades_dot_plot
 ```
-
-Based on ROC_AUC values, it looks like the Boosted Tree using Method 1. merged dataset gave us the best results. Let's try fitting the testing data to this model.
+Based on ROC_AUC values, the boosted tree model using Method 1 merged dataset gave us the best results. Let's try fitting the testing data to this model.
 
 ```{r}
 # show metrics
-collect_metrics(boostedtree_tune_res) %>% arrange(desc(mean))
+show_best(boostedtree_tune_res, metric = "roc_auc")
 
 # select the best
-boostedtree_best_complexity <- select_best(boostedtree_tune_res, metric = "roc_auc")
-boostedtree_best_complexity
-
-show_best(boostedtree_tune_res, metric = "roc_auc") %>% #showing the best rf model
+show_best(boostedtree_tune_res, metric = "roc_auc") %>%
   select(-.estimator, .config) %>%
   slice(1)
 
@@ -1306,9 +1439,31 @@ grades_roc_curve <- augment(xgb_final_fit1, new_data = grades_test_fctr) %>%
 autoplot(grades_roc_curve)
 
 # computing the AUC for the ROC curve
+finalgrades_acc <- augment(xgb_final_fit1, new_data = grades_test_fctr) %>%
+  accuracy(truth = g3, estimate = .pred_class) %>%
+  select(.estimate)
+finalgrades_acc
+
 finalgrades_roc_auc <- augment(xgb_final_fit1, new_data = grades_test_fctr) %>%
   roc_auc(truth = g3, estimate = .pred_Fail) %>%
   select(.estimate)
 finalgrades_roc_auc
 ```
+
+The boosted tree model using Method 1, merged dataset, gave us a 0.9044586 accuracy and 0.968298 roc_auc on the testing data.
+
+*   If we wanted to take our analysis further, I might try fitting a random forest model and/or k nearest neighbors. The boosted tree did the best, better than the individual decision tree model, which may be a result of collecting knowledge from fitting several trees instead of just one. (In which case a random forest would also give great results) I would also explore why the accuracy and roc_auc values decreased after conducting k-fold cross validation on the logistic regression model.
+
+*   While there was initially concern of how our outcome variable (G3) would perform with a regression versus classification model due to uneven proportions of grade categories, this was remedied by instead splitting G3 grades into "Fail" and "Pass" labels. We chose classification because this new labeling system worked so well, giving us accuracies and roc_auc values of mostly 0.9 or upwards.
+
+*   To answer our experiment of choosing Method 1 or 2, most models performed better when using Method 1. Perhaps this is telling us that there is still detectable difference between the Maths and Portuguese datasets, such that when a model is only trained on one of the datasets, it still has some difficulty predicting on the testing data.
+
+*   The variables that most heavily influence a student's G3 grades are their G1, G2 grades, past failures, and alcohol consumption (moreso weekend alcohol consumption). Mother's education and Father's education are correlated among themselves, but their relationships with G3 grades can be further investigated.
+
+This was a great project to work on, I thoroughly enjoyed it because of my love for exploring the intersection between statistics, data, education, and the ways each field can enhance one another. Working with grades data and observing which factors heavily impact performance is a great first step in targeting the needs and kinds of resources needed to support students. My goal in the future is to use data analysis methods to better understand the needs, goals, and backgrounds of students, which will hopefully help me find ways to motivate and help them excel in their careers.
+
+<center>
+
+![](/Users/cupca/OneDrive/Documents/UCSB/Fall2022/PSTAT131/Final-Project/Final-Project-laurenrhuang/images/conclusion_gif.webp)
+</center>
 
